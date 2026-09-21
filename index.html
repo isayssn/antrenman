@@ -265,8 +265,18 @@
   .ex > .anatomy .anatomy-title{display:none;}
   .ex > .anatomy .anatomy-figs{margin-top:0;}
 
+  /* ad ve "YouTube'da ara" düğmesi aynı ızgara hücresini paylaşır */
+  .ex-bas{grid-column:2;grid-row:1;display:flex;align-items:center;gap:8px;min-width:0;}
+  .ex-ara{
+    position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;
+    width:28px;height:28px;color:var(--ink-soft);
+    background:#fff;border:1px solid var(--rule);border-radius:2px;
+  }
+  .ex-ara::after{content:"";position:absolute;inset:-8px;}   /* parmak için 44px hedef */
+  .ex-ara:hover{color:var(--day);border-color:var(--day);}
+  .ex-ara svg{width:14px;height:14px;}
   .ex-name{
-    grid-column:2;grid-row:1;
+    grid-row:1;
     font:inherit;font-weight:600;font-size:1.02rem;line-height:1.3;color:inherit;
     margin:0;padding:0;border:0;background:none;text-align:left;cursor:pointer;
   }
@@ -319,6 +329,9 @@
   .detail-title{font-size:clamp(1.5rem,4.5vw,1.95rem);font-weight:600;line-height:1.1;margin:4px 0 0;color:var(--day);}
   .detail-title:focus{outline:none;}   /* receives focus on open so screen readers announce the exercise */
   .detail-plan{margin:6px 0 0;font-size:.88rem;font-weight:500;}
+  .detail-kisayol{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;}
+  .detail-kisayol .btn-ghost{font-size:.82rem;padding:5px 11px;text-decoration:none;}
+  .kopya-msg{font-size:.8rem;color:var(--ink-soft);}
 
   .detail-close{
     flex:none;display:grid;place-items:center;width:38px;height:38px;margin:-4px -8px 0 0;
@@ -793,7 +806,7 @@
     body{background:#fff;}
     .day,.wk,.gun,.k-fig,tr{break-inside:avoid;}
     .day[hidden]{display:block;}
-    .anatomy,.ex-log,.detail,.k-actions,.filtre,.sayfa-alt{display:none;}
+    .anatomy,.ex-log,.ex-ara,.detail,.k-actions,.filtre,.sayfa-alt{display:none;}
   }
 </style>
 </head>
@@ -1296,6 +1309,11 @@
         <p class="detail-kicker"></p>
         <h2 class="detail-title" id="detay-baslik" tabindex="-1" autofocus></h2>
         <p class="detail-plan"></p>
+        <p class="detail-kisayol">
+          <a class="btn-ghost" data-ara target="_blank" rel="noopener">YouTube'da ara</a>
+          <button type="button" class="btn-ghost" data-kopyala>Adı kopyala</button>
+          <span class="kopya-msg" role="status" aria-live="polite"></span>
+        </p>
       </div>
       <button type="button" class="detail-close" aria-label="Kapat">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
@@ -1715,6 +1733,54 @@
     const depola = () => { try { localStorage.setItem(DEPO, JSON.stringify(depo)); return true; } catch { return false; } };
     const seanslar = anahtar => (depo.kayitlar[anahtar] || []).slice().sort((a, b) => a.tarih.localeCompare(b.tarih));
 
+    // Hareketi telefonda izlemek için hızlı kısayol: satırdaki düğme YouTube aramasını açar,
+    // detay ekranında ayrıca "Adı kopyala" var (pano izni yoksa eski usul seçip kopyalamaya düşer).
+    const youtubeAdresi = ad => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(ad);
+    const YT_IKON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.6 4.4a2 2 0 0 1 1.6-1.6C4.6 2.5 8 2.5 8 2.5s3.4 0 4.8.3a2 2 0 0 1 1.6 1.6c.1 1 .1 2.4.1 2.4s0 1.4-.1 2.4a2 2 0 0 1-1.6 1.6c-1.4.3-4.8.3-4.8.3s-3.4 0-4.8-.3a2 2 0 0 1-1.6-1.6C1.5 8.2 1.5 6.8 1.5 6.8s0-1.4.1-2.4Z" fill="currentColor"/><path d="M6.7 5.2 9.8 6.8l-3.1 1.6V5.2Z" fill="#fff"/></svg>';
+    const eskiUsulKopya = metin => {
+      try {
+        const alan = document.createElement('textarea');
+        alan.value = metin;
+        alan.setAttribute('readonly', '');
+        alan.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+        document.body.append(alan);
+        alan.select();
+        const oldu = document.execCommand('copy');
+        alan.remove();
+        return oldu;
+      } catch { return false; }
+    };
+    const panoyaYaz = async metin => {
+      // Pano izni sorulurken yanıt hiç gelmeyebiliyor; 1,2 sn sonra eski usule düşüp geri bildirim veriyoruz.
+      try {
+        if (navigator.clipboard?.writeText) {
+          await Promise.race([
+            navigator.clipboard.writeText(metin),
+            new Promise((_, red) => setTimeout(() => red(new Error('pano yanıt vermedi')), 1200)),
+          ]);
+          return true;
+        }
+      } catch { /* izin yok, güvenli bağlam değil ya da yanıt gelmedi */ }
+      return eskiUsulKopya(metin);
+    };
+    document.querySelectorAll('.ex').forEach(ex => {
+      const ad = ex.querySelector('.ex-name');
+      const sarmal = document.createElement('div');
+      sarmal.className = 'ex-bas';
+      ad.replaceWith(sarmal);
+      sarmal.append(ad);
+      const link = document.createElement('a');
+      link.className = 'ex-ara';
+      link.href = youtubeAdresi(ad.textContent);
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.title = `${ad.textContent} — YouTube'da ara`;
+      link.setAttribute('aria-label', link.title);
+      link.innerHTML = YT_IKON;
+      link.addEventListener('click', e => e.stopPropagation());   // satır seçimini tetiklemesin
+      sarmal.append(link);
+    });
+
     // Satırdaki düğme: son antrenmanın en ağır seti; kayıt yoksa "Kayıt ekle".
     const IKON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 12 5.5 7.5l3 2.5 6-6.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     const rozetGuncelle = ex => {
@@ -2086,7 +2152,10 @@
       aktif = {ex, anahtar: exAnahtar(ex), plan: planOku(ex)};
       detay.dataset.tur = day.classList.contains('day--lower') ? 'lower' : 'upper';
       $('.detail-kicker').textContent = `${day.querySelector('.daycard-title').textContent} · ${day.querySelector('.day-when').textContent}`;
-      $('.detail-title').textContent = ex.querySelector('.ex-name').textContent;
+      const exAd = ex.querySelector('.ex-name').textContent;
+      $('.detail-title').textContent = exAd;
+      $('[data-ara]').href = youtubeAdresi(exAd);
+      $('.kopya-msg').textContent = '';
       $('.detail-plan').textContent = 'Hedef ' + aktif.plan.yazi;
       $('.detail-target').textContent = ex.querySelector('.ex-target').textContent;
       const not = ex.querySelector('.ex-note');
@@ -2099,6 +2168,11 @@
       yenile();   // grafik genişliği ancak pencere açıkken ölçülebiliyor
     };
 
+    $('[data-kopyala]').addEventListener('click', async () => {
+      const oldu = await panoyaYaz($('.detail-title').textContent);
+      $('.kopya-msg').textContent = oldu ? 'Kopyalandı' : 'Kopyalanamadı, adı elle seç';
+      setTimeout(() => { $('.kopya-msg').textContent = ''; }, 2500);
+    });
     $('.detail-close').addEventListener('click', () => detay.close());
     detay.addEventListener('click', e => { if (e.target === detay) detay.close(); });
 
