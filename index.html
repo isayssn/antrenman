@@ -674,6 +674,9 @@
   .seg button:hover{background:var(--paper);}
   .seg button[aria-pressed="true"]{background:var(--ink);color:#fff;}
   .k-not{font-size:.8rem;color:var(--ink-soft);align-self:center;}
+  .esitle-durum{font-size:.82rem;color:var(--ink-soft);align-self:center;}
+  .esitle-durum.is-error{color:var(--caution);}
+  .iyimser{color:var(--ink-soft);font-weight:400;}
   .detail--dar{width:min(560px,100%);}
   .adimlar{margin:0;padding:0 0 0 22px;display:grid;gap:22px;}
   .adimlar li{padding-left:4px;}
@@ -1291,13 +1294,51 @@
 </div>
 
 <div class="sayfa-alt">
-  <p>Kayıtlar (salon, koşu, yüzme) yalnızca bu tarayıcıda saklanır. Başka bir cihaza taşımak ya da kaybetmemek için yedek al. Strava'dan aktarılan koşu dosyası da buradan yüklenir.</p>
+  <p>Kayıtlar (salon, koşu, yüzme, beslenme) bu tarayıcıda saklanır. Cihazlar arasında taşımak için eşitlemeyi aç ya da yedek al; Strava'dan aktarılan koşu dosyası da buradan yüklenir.</p>
+  <div class="foot-actions">
+    <button type="button" class="btn-ghost" data-esitle="simdi">Şimdi eşitle</button>
+    <button type="button" class="btn-ghost" data-esitle="kur">Eşitleme ayarları</button>
+    <span class="esitle-durum" role="status" aria-live="polite"></span>
+  </div>
   <div class="foot-actions">
     <button type="button" class="btn-ghost" data-yedek="indir">Yedeği indir</button>
     <label class="btn-ghost">Yedek yükle<input type="file" accept=".json,application/json" data-yedek="yukle" hidden></label>
     <span class="foot-msg" role="status" aria-live="polite"></span>
   </div>
 </div>
+
+<!-- EŞİTLEME: kayıtları gizli bir GitHub gist üzerinden cihazlar arasında paylaşır. -->
+<dialog class="detail detail--dar" id="esitle" aria-labelledby="esitle-baslik">
+  <div class="detail-sheet">
+    <header class="detail-head">
+      <div class="detail-id">
+        <p class="detail-kicker">Cihazlar arası</p>
+        <h2 class="detail-title" id="esitle-baslik" tabindex="-1" autofocus>Eşitleme</h2>
+        <p class="detail-plan">Kayıtlar gizli bir gist'te durur; her cihaz onu okuyup kendi verisiyle birleştirir.</p>
+      </div>
+      <button type="button" class="detail-close" aria-label="Kapat">&times;</button>
+    </header>
+    <div class="detail-body">
+      <ol class="adimlar">
+        <li><a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Antrenman%20sayfasi" target="_blank" rel="noopener">GitHub jetonu oluştur</a> — açılan sayfada yalnız <b>gist</b> izni işaretli gelir, süreyi uzun seç ve "Generate token" de.</li>
+        <li>Jetonu aşağıya yapıştır. <b>İlk cihazda</b> gist alanını boş bırak, sayfa gizli bir gist açar.</li>
+        <li><b>İkinci cihazda</b> aynı jetonu ve buradaki gist kimliğini gir; iki cihaz aynı kaydı görür.</li>
+      </ol>
+      <form class="log-form esitle-form" novalidate>
+        <div class="k-form-grid">
+          <label class="genis"><span>GitHub jetonu</span><input name="jeton" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…"></label>
+          <label class="genis"><span>Gist kimliği ya da adresi <span class="iyimser">(ilk cihazda boş bırak)</span></span><input name="gist" autocomplete="off" spellcheck="false" placeholder="https://gist.github.com/…"></label>
+        </div>
+        <div class="log-actions">
+          <button type="button" class="btn-ghost" data-esitle="kaldir" hidden>Bağlantıyı kaldır</button>
+          <span class="log-msg" role="status" aria-live="polite"></span>
+          <button type="submit" class="btn">Kaydet ve eşitle</button>
+        </div>
+      </form>
+      <p class="strava-not">Jeton yalnızca bu tarayıcıda, kayıtlardan ayrı bir anahtarda durur; yedeğe ve demoya geçmez. Gist "secret" açılır: adresi bilmeyen göremez, ama GitHub hesabında durur. İstediğin an GitHub ayarlarından jetonu iptal edebilirsin.</p>
+    </div>
+  </div>
+</dialog>
 
 </div>
 
@@ -1910,8 +1951,9 @@
       if (!setler.length) return mesajYaz('En az bir setin ağırlık ve tekrarını gir.', true);
       depo.kayitlar[aktif.anahtar] = (depo.kayitlar[aktif.anahtar] || [])
         .filter(s => s.tarih !== tarih && s.tarih !== duzenlenen)
-        .concat({tarih, setler});
+        .concat(damga({tarih, setler}));
       const tamam = depola();
+      esitleSonra();
       yenile();
       formuDoldur(tarih);
       mesajYaz(tamam ? 'Kaydedildi.' : 'Kaydedilemedi: tarayıcı depolamaya izin vermiyor.', !tamam);
@@ -2129,8 +2171,10 @@
         });
         sil.addEventListener('click', () => {
           if (!confirm(`${tamTarih.format(d)} kaydı silinsin mi?`)) return;
+          mezar(`kayit|${aktif.anahtar}|${seans.tarih}`);
           depo.kayitlar[aktif.anahtar] = (depo.kayitlar[aktif.anahtar] || []).filter(s => s.tarih !== seans.tarih);
           depola();
+          esitleSonra();
           yenile();
           if (duzenlenen === seans.tarih) formuDoldur(bugun());
         });
@@ -2461,7 +2505,9 @@
           const anahtarlar = ogun.ogeler.map((_, i) => ogeAnahtar(oi, i));
           kayit.isaretli = tamam ? kayit.isaretli.filter(a => !anahtarlar.includes(a))
             : [...new Set([...kayit.isaretli, ...anahtarlar])];
+          damga(kayit);
           depola();
+          esitleSonra();
           beslenmeCiz();
           gelisimCiz();
         });
@@ -2478,7 +2524,9 @@
           kutu.addEventListener('change', () => {
             const kayit = beslenmeYaz(bTarih);
             kayit.isaretli = kutu.checked ? [...new Set([...kayit.isaretli, anahtar])] : kayit.isaretli.filter(a => a !== anahtar);
+            damga(kayit);
             depola();
+            esitleSonra();
             beslenmeCiz();
             gelisimCiz();
           });
@@ -2502,13 +2550,17 @@
     document.querySelectorAll('[data-gun-tipi] button').forEach(b => b.addEventListener('click', () => {
       const g = beslenmeYaz(bTarih);
       g.off = b.dataset.g === 'off';
+      damga(g);
       depola();
+      esitleSonra();
       beslenmeCiz();
     }));
     document.querySelectorAll('[data-su]').forEach(b => b.addEventListener('click', () => {
       const g = beslenmeYaz(bTarih);
       g.su = Math.max(0, Math.min(BESLENME.su + 1000, g.su + Number(b.dataset.su)));
+      damga(g);
       depola();
+      esitleSonra();
       beslenmeCiz();
     }));
 
@@ -3064,7 +3116,9 @@
           e.stopPropagation();
           const kayit = depo.kardiyo.find(x => x.id === k.id);
           if (kayit.gizli) delete kayit.gizli; else kayit.gizli = true;
+          damga(kayit);
           depola();
+          esitleSonra();
           sayfaYenile();
         });
         tr.addEventListener('click', () => kardiyoAc(k));
@@ -3548,8 +3602,9 @@
       // Tür, mesafe ya da süre değiştiyse Strava'dan gelen ayrıntılar artık bu koşuyu anlatmıyor.
       if (!ayniTur || !ayniMesafe || !ayniSure) ['enIyi', 'profil', 'dilimler', 'bolgeler'].forEach(a => delete yeni[a]);
       Object.keys(yeni).forEach(a => { if (yeni[a] === undefined) delete yeni[a]; });
-      depo.kardiyo = depo.kardiyo.filter(k => k.id !== yeni.id).concat(yeni);
+      depo.kardiyo = depo.kardiyo.filter(k => k.id !== yeni.id).concat(damga(yeni));
       const tamam = depola();
+      esitleSonra();
       sayfaYenile();
       kardiyoAc(yeni);
       kq('.k-duzenle').open = true;
@@ -3558,8 +3613,10 @@
 
     kq('[data-sil]').addEventListener('click', () => {
       if (!kKayit || !confirm(`${kKayit.ad || turAdi[kKayit.tur]} (${tamTarih.format(tarihOku(kKayit.tarih))}) silinsin mi?`)) return;
+      mezar(`kardiyo|${kKayit.id}`);
       depo.kardiyo = depo.kardiyo.filter(k => k.id !== kKayit.id);
       depola();
+      esitleSonra();
       sayfaYenile();
       kd.close();
     });
@@ -3602,7 +3659,7 @@
               .map(x => ({kg: x.kg, tekrar: x.tekrar, rir: Number.isInteger(x.rir) ? x.rir : null}));
             if (!setler.length) continue;
             const i = mevcut.findIndex(m => m.tarih === s.tarih);
-            if (i >= 0) mevcut[i] = {tarih: s.tarih, setler}; else mevcut.push({tarih: s.tarih, setler});
+            if (i >= 0) mevcut[i] = damga({tarih: s.tarih, setler}); else mevcut.push(damga({tarih: s.tarih, setler}));
             salon++;
           }
           depo.kayitlar[anahtar] = mevcut;
@@ -3611,15 +3668,23 @@
           if (!k || !/^\d{4}-\d{2}-\d{2}$/.test(k.tarih) || !turAdi[k.tur] || !(k.mesafe > 0) || !(k.sure > 0)) continue;
           const temiz = Object.fromEntries(KARDIYO_ALANLARI.filter(a => k[a] != null).map(a => [a, k[a]]));
           temiz.id = String(temiz.id || `elle-${Date.now()}-${kardiyo}`);
-          depo.kardiyo = depo.kardiyo.filter(x => x.id !== temiz.id).concat(temiz);
+          depo.kardiyo = depo.kardiyo.filter(x => x.id !== temiz.id).concat(damga(temiz));
           kardiyo++;
         }
         if (gelen.ayarlar && typeof gelen.ayarlar === 'object') depo.ayarlar = {...depo.ayarlar, ...gelen.ayarlar};
+        let beslenme = 0;
+        for (const [tarih, g] of Object.entries(gelen.beslenme || {})) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(tarih) || !g || !Array.isArray(g.isaretli)) continue;
+          depo.beslenme ??= {};
+          const mevcut = depo.beslenme[tarih];
+          if (!mevcut || (g.d || 0) >= (mevcut.d || 0)) { depo.beslenme[tarih] = g; beslenme++; }
+        }
         const tamam = depola();
+        esitleSonra();
         document.querySelectorAll('.ex').forEach(rozetGuncelle);
         sayfaYenile();
         if (aktif && detay.open) { yenile(); formuDoldur(tarihGir.value || bugun()); }
-        const ne = [salon && `${salon} salon antrenmanı`, kardiyo && `${kardiyo} koşu/yüzme`].filter(Boolean).join(', ') || 'yeni kayıt yok';
+        const ne = [salon && `${salon} salon antrenmanı`, kardiyo && `${kardiyo} koşu/yüzme`, beslenme && `${beslenme} beslenme günü`].filter(Boolean).join(', ') || 'yeni kayıt yok';
         yedekMesaj(e.target, tamam ? `Yüklendi: ${ne}.` : 'Yüklendi ama kaydedilemedi: tarayıcı depolamaya izin vermiyor.', !tamam);
       } catch {
         yedekMesaj(e.target, 'Dosya okunamadı. Bu sayfadan indirilmiş bir yedek ya da Strava dosyası mı?', true);
@@ -3793,12 +3858,12 @@
           kayit.profil = islenmis.profil;
           if (islenmis.bolgeler) kayit.bolgeler = islenmis.bolgeler;
         }
-        depo.kardiyo.push(kayit);
+        depo.kardiyo.push(damga(kayit));
         eklendi++;
       }
       strava.sonGuncelleme = Date.now();
       stravaYaz();
-      if (eklendi) { depola(); sayfaYenile(); }
+      if (eklendi) { depola(); esitleSonra(); sayfaYenile(); }
       const metin = eklendi ? `${eklendi} yeni koşu eklendi` : 'yeni koşu yok';
       sonGuncellemeYaz(metin + (atlandi ? `, ${atlandi} kayıt atlandı` : ''));
       return eklendi ? `${eklendi} yeni koşu eklendi.` : 'Yeni koşu yok.';
@@ -3849,6 +3914,215 @@
       try { await stravaCek(); } catch (h) { durum(h.message, true); } finally { e.target.disabled = false; }
     });
     sonGuncellemeYaz(stravaBagli() ? '' : 'kurmak için düğmeye bas');
+
+    // ---------- Eşitleme (GitHub gist) ----------
+    // Kayıtlar gizli bir gist'te bir JSON dosyası olarak durur; her cihaz onu okuyup kendi verisiyle
+    // birleştirir ve geri yazar. Sunucu yok. Jeton kayıtlardan AYRI anahtarda, yedeğe hiç girmez.
+    //
+    // Birleştirme "birleşim + silme izi" mantığı: iki tarafta da olan kayıtta damgası (d) yeni olan kazanır,
+    // yalnız bir tarafta olan doğrudan alınır. Silinenler `silinen` sözlüğünde iz bırakır; izin damgası
+    // kaydınkinden yeniyse kayıt geri gelmez. (Damgasız eski kayıtlar 0 sayılır, yani her zaman kaybeder.)
+    const ESITLE_DEPO = 'antrenman-programi:esitle';
+    const GIST_DOSYA = 'antrenman.json';
+    let esitleme = {};
+    try { esitleme = JSON.parse(localStorage.getItem(ESITLE_DEPO)) || {}; } catch { esitleme = {}; }
+    const esitlemeYaz = () => { try { localStorage.setItem(ESITLE_DEPO, JSON.stringify(esitleme)); } catch { /* depolama kapalı */ } };
+    const esitlemeVar = () => !!(esitleme.jeton && esitleme.gist);
+
+    const damga = nesne => { nesne.d = Date.now(); return nesne; };
+    const mezar = anahtar => {
+      depo.silinen ??= {};
+      depo.silinen[anahtar] = Date.now();
+    };
+    const gomulu = (anahtar, kayit) => (depo.silinen?.[anahtar] || 0) > (kayit?.d || 0);
+
+    const gistApi = async (yol, secenek = {}) => {
+      const y = await fetch('https://api.github.com' + yol, {
+        ...secenek,
+        headers: {
+          Authorization: `Bearer ${esitleme.jeton}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...(secenek.body ? {'Content-Type': 'application/json'} : {}),
+        },
+      });
+      if (y.status === 401) throw new Error('Jeton kabul edilmedi. Süresi dolmuş ya da yanlış olabilir.');
+      if (y.status === 403) throw new Error('GitHub isteği reddetti; jetonun "gist" izni var mı?');
+      if (y.status === 404) throw new Error('Gist bulunamadı. Bağlantıyı yeniden kur.');
+      if (!y.ok) throw new Error(`GitHub yanıt vermedi (${y.status}).`);
+      return y.json();
+    };
+
+    // İki depoyu birleştirir; hangi tarafın neyi getirdiğini de sayar.
+    const depoBirlestir = (yerel, uzak) => {
+      const sonuc = {surum: 1, kayitlar: {}, kardiyo: [], ayarlar: {}, beslenme: {}, silinen: {}};
+      sonuc.silinen = {...(uzak.silinen || {}), ...(yerel.silinen || {})};
+      for (const [a, ts] of Object.entries(uzak.silinen || {})) sonuc.silinen[a] = Math.max(ts, sonuc.silinen[a] || 0);
+
+      const anahtarlar = new Set([...Object.keys(yerel.kayitlar || {}), ...Object.keys(uzak.kayitlar || {})]);
+      anahtarlar.forEach(anahtar => {
+        const harita = new Map();
+        (yerel.kayitlar?.[anahtar] || []).forEach(s => harita.set(s.tarih, s));
+        (uzak.kayitlar?.[anahtar] || []).forEach(s => {
+          const mevcut = harita.get(s.tarih);
+          if (!mevcut || (s.d || 0) > (mevcut.d || 0)) harita.set(s.tarih, s);
+        });
+        const liste = [...harita.values()]
+          .filter(s => !gomulu(`kayit|${anahtar}|${s.tarih}`, s))
+          .sort((a, b) => a.tarih.localeCompare(b.tarih));
+        if (liste.length) sonuc.kayitlar[anahtar] = liste;
+      });
+
+      const kh = new Map();
+      (yerel.kardiyo || []).forEach(k => kh.set(k.id, k));
+      (uzak.kardiyo || []).forEach(k => {
+        const mevcut = kh.get(k.id);
+        if (!mevcut || (k.d || 0) > (mevcut.d || 0)) kh.set(k.id, k);
+      });
+      sonuc.kardiyo = [...kh.values()].filter(k => !gomulu(`kardiyo|${k.id}`, k));
+
+      const bh = {...(uzak.beslenme || {})};
+      Object.entries(yerel.beslenme || {}).forEach(([tarih, g]) => {
+        const uzakGun = bh[tarih];
+        if (!uzakGun || (g.d || 0) >= (uzakGun.d || 0)) bh[tarih] = g;
+      });
+      sonuc.beslenme = Object.fromEntries(Object.entries(bh).filter(([tarih, g]) => !gomulu(`beslenme|${tarih}`, g)));
+      sonuc.ayarlar = {...(uzak.ayarlar || {}), ...(yerel.ayarlar || {})};
+
+      // "Şunlar geldi" sayısı: sonuçta duran ama yerelde olmayan kayıtlar. Silme izine takılanlar sayılmaz.
+      const yereldeVar = (anahtar, tarih) => (yerel.kayitlar?.[anahtar] || []).some(s => s.tarih === tarih);
+      const say = {
+        salon: Object.entries(sonuc.kayitlar).reduce((t, [anahtar, l]) => t + l.filter(s => !yereldeVar(anahtar, s.tarih)).length, 0),
+        kardiyo: sonuc.kardiyo.filter(k => !(yerel.kardiyo || []).some(x => x.id === k.id)).length,
+        beslenme: Object.keys(sonuc.beslenme).filter(tarih => !(yerel.beslenme || {})[tarih]).length,
+      };
+      return {sonuc, say};
+    };
+
+    const esitleDurum = (metin, hata) => {
+      document.querySelectorAll('.esitle-durum').forEach(el => {
+        el.textContent = metin;
+        el.classList.toggle('is-error', !!hata);
+      });
+    };
+    const esitleZaman = ek => esitleDurum([
+      esitlemeVar() ? 'Eşitleme açık' : 'Eşitleme kapalı',
+      esitleme.son ? `son ${gunAy.format(new Date(esitleme.son))} ${saatDk.format(new Date(esitleme.son))}` : '',
+      ek,
+    ].filter(Boolean).join(' · '));
+
+    let esitleniyor = false, bekleyen = null;
+    const esitle = async ({sessiz = false} = {}) => {
+      if (!esitlemeVar() || esitleniyor) return;
+      esitleniyor = true;
+      if (!sessiz) esitleDurum('Eşitleniyor…');
+      try {
+        const gist = await gistApi(`/gists/${esitleme.gist}`);
+        const icerik = gist.files?.[GIST_DOSYA]?.content;
+        let uzak = {};
+        if (icerik) { try { uzak = JSON.parse(icerik); } catch { uzak = {}; } }
+        const {sonuc, say} = depoBirlestir(depo, uzak);
+        const yereldeDegisti = JSON.stringify(sonuc) !== JSON.stringify({
+          surum: 1, kayitlar: depo.kayitlar, kardiyo: depo.kardiyo,
+          ayarlar: depo.ayarlar, beslenme: depo.beslenme || {}, silinen: depo.silinen || {},
+        });
+        if (yereldeDegisti) {
+          depo.kayitlar = sonuc.kayitlar;
+          depo.kardiyo = sonuc.kardiyo;
+          depo.ayarlar = sonuc.ayarlar;
+          depo.beslenme = sonuc.beslenme;
+          depo.silinen = sonuc.silinen;
+          depola();
+          document.querySelectorAll('.ex').forEach(rozetGuncelle);
+          sayfaYenile();
+        }
+        if (JSON.stringify(sonuc) !== JSON.stringify(uzak)) {
+          await gistApi(`/gists/${esitleme.gist}`, {
+            method: 'PATCH',
+            body: JSON.stringify({files: {[GIST_DOSYA]: {content: JSON.stringify(sonuc)}}}),
+          });
+        }
+        esitleme.son = Date.now();
+        esitlemeYaz();
+        const geldi = [say.salon && `${say.salon} salon kaydı`, say.kardiyo && `${say.kardiyo} koşu/yüzme`,
+          say.beslenme && `${say.beslenme} beslenme günü`].filter(Boolean).join(', ');
+        esitleZaman(geldi ? `${geldi} alındı` : 'güncel');
+      } catch (h) {
+        esitleDurum(h.message, true);
+      } finally {
+        esitleniyor = false;
+      }
+    };
+    // Kayıt sonrası kendiliğinden: art arda değişikliklerde tek istek olsun diye 4 sn beklenir.
+    const esitleSonra = () => {
+      if (!esitlemeVar()) return;
+      clearTimeout(bekleyen);
+      bekleyen = setTimeout(() => esitle({sessiz: true}), 4000);
+    };
+
+    const ed = document.getElementById('esitle');
+    const eq = sel => ed.querySelector(sel);
+    const ef = eq('.esitle-form');
+    const eMesaj = (metin, hata) => {
+      const m = eq('.log-msg');
+      m.textContent = metin;
+      m.classList.toggle('is-error', !!hata);
+    };
+    const esitleAc = () => {
+      ef.elements.jeton.value = esitleme.jeton || '';
+      ef.elements.gist.value = esitleme.gist || '';
+      eq('[data-esitle="kaldir"]').hidden = !esitlemeVar();
+      eMesaj(esitlemeVar() ? `Bağlı. Gist kimliği: ${esitleme.gist}` : '');
+      if (!ed.open) ed.showModal();
+    };
+    ef.addEventListener('submit', async e => {
+      e.preventDefault();
+      const jeton = ef.elements.jeton.value.trim();
+      const girilen = ef.elements.gist.value.trim();
+      if (!jeton) return eMesaj('Jeton gerekli.', true);
+      const eski = {...esitleme};
+      esitleme = {jeton, gist: (girilen.match(/[0-9a-f]{20,}/i) || [''])[0], son: esitleme.son};
+      try {
+        if (!esitleme.gist) {
+          eMesaj('Gist açılıyor…');
+          const yeni = await gistApi('/gists', {
+            method: 'POST',
+            body: JSON.stringify({
+              description: 'Antrenman sayfası kayıtları (gizli)',
+              public: false,
+              files: {[GIST_DOSYA]: {content: JSON.stringify({surum: 1, kayitlar: depo.kayitlar, kardiyo: depo.kardiyo, ayarlar: depo.ayarlar, beslenme: depo.beslenme || {}, silinen: depo.silinen || {}})}},
+            }),
+          });
+          esitleme.gist = yeni.id;
+        }
+        esitlemeYaz();
+        eMesaj('Eşitleniyor…');
+        await esitle();
+        eq('[data-esitle="kaldir"]').hidden = false;
+        eMesaj(`Bağlandı. Gist kimliği: ${esitleme.gist} — ikinci cihazda bunu gir.`);
+      } catch (h) {
+        esitleme = eski;
+        esitlemeYaz();
+        eMesaj(h.message, true);
+      }
+    });
+    eq('[data-esitle="kaldir"]').addEventListener('click', () => {
+      esitleme = {};
+      try { localStorage.removeItem(ESITLE_DEPO); } catch { /* depolama kapalı */ }
+      eq('[data-esitle="kaldir"]').hidden = true;
+      eMesaj('Bağlantı kaldırıldı. Gist ve içindeki kayıtlar GitHub\'da duruyor.');
+      esitleZaman();
+    });
+    eq('.detail-close').addEventListener('click', () => ed.close());
+    ed.addEventListener('click', e => { if (e.target === ed) ed.close(); });
+    document.querySelector('[data-esitle="kur"]').addEventListener('click', esitleAc);
+    document.querySelector('[data-esitle="simdi"]').addEventListener('click', async e => {
+      if (!esitlemeVar()) return esitleAc();
+      e.target.disabled = true;
+      try { await esitle(); } finally { e.target.disabled = false; }
+    });
+    esitleZaman(esitlemeVar() ? '' : 'kurmak için "Eşitleme ayarları"');
+    if (esitlemeVar()) esitle({sessiz: true});
 
     // ---------- Ana sekmeler ----------
     // Fitness / Koşu / Yüzme / Analiz. Adres çubuğundaki #kosu, #yuzme, #analiz açılışta o sekmeyi seçer.
