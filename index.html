@@ -4084,6 +4084,15 @@
       esitleme = {jeton, gist: (girilen.match(/[0-9a-f]{20,}/i) || [''])[0], son: esitleme.son};
       try {
         if (!esitleme.gist) {
+          // Boş bırakıldıysa önce hesapta bu sayfanın gist'i var mı diye bakılır: yoksa her cihaz
+          // kendi gist'ini açar ve veriler hiç buluşmaz (ilk kurulumda başımıza gelen tam buydu).
+          eMesaj('Var olan gist aranıyor…');
+          const liste = await gistApi('/gists?per_page=100');
+          const adaylar = (Array.isArray(liste) ? liste : []).filter(g => g.files && g.files[GIST_DOSYA])
+            .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));   // en son yazılan
+          if (adaylar[0]) esitleme.gist = adaylar[0].id;
+        }
+        if (!esitleme.gist) {
           eMesaj('Gist açılıyor…');
           const yeni = await gistApi('/gists', {
             method: 'POST',
@@ -4099,7 +4108,7 @@
         eMesaj('Eşitleniyor…');
         await esitle();
         eq('[data-esitle="kaldir"]').hidden = false;
-        eMesaj(`Bağlandı. Gist kimliği: ${esitleme.gist} — ikinci cihazda bunu gir.`);
+        eMesaj(`Bağlandı. Gist kimliği: ${esitleme.gist} — bütün cihazlarda aynısı olmalı.`);
       } catch (h) {
         esitleme = eski;
         esitlemeYaz();
