@@ -4005,11 +4005,26 @@
         el.classList.toggle('is-error', !!hata);
       });
     };
+    // Hangi gist'e yazdığımız durum satırında görünür: iki cihaz ayrı depoya yazarsa fark hemen belli olsun.
     const esitleZaman = ek => esitleDurum([
-      esitlemeVar() ? 'Eşitleme açık' : 'Eşitleme kapalı',
+      esitlemeVar() ? `Eşitleme açık · ${esitleme.gist.slice(0, 7)}` : 'Eşitleme kapalı',
       esitleme.son ? `son ${gunAy.format(new Date(esitleme.son))} ${saatDk.format(new Date(esitleme.son))}` : '',
       ek,
     ].filter(Boolean).join(' · '));
+
+    // Hesapta birden fazla antrenman gist'i varsa cihazlar ayrı depolara yazıyor demektir; uyar.
+    const fazlaGistUyar = async () => {
+      try {
+        const liste = await gistApi('/gists?per_page=100');
+        const digerleri = (Array.isArray(liste) ? liste : [])
+          .filter(g => g.files && g.files[GIST_DOSYA] && g.id !== esitleme.gist);
+        if (!digerleri.length) return false;
+        esitleDurum(`Dikkat: hesapta ${digerleri.length + 1} ayrı antrenman gist'i var `
+          + `(${[esitleme.gist, ...digerleri.map(g => g.id)].map(x => x.slice(0, 7)).join(', ')}). `
+          + 'Cihazlar ayrı depolara yazıyor olabilir — hepsinde aynı kimliği gir.', true);
+        return true;
+      } catch { return false; }
+    };
 
     let esitleniyor = false, bekleyen = null;
     const esitle = async ({sessiz = false} = {}) => {
@@ -4047,6 +4062,7 @@
         const geldi = [say.salon && `${say.salon} salon kaydı`, say.kardiyo && `${say.kardiyo} koşu/yüzme`,
           say.beslenme && `${say.beslenme} beslenme günü`].filter(Boolean).join(', ');
         esitleZaman(geldi ? `${geldi} alındı` : 'güncel');
+        if (!sessiz) await fazlaGistUyar();
       } catch (h) {
         esitleDurum(h.message, true);
       } finally {
@@ -4131,7 +4147,7 @@
       try { await esitle(); } finally { e.target.disabled = false; }
     });
     esitleZaman(esitlemeVar() ? '' : 'kurmak için "Eşitleme ayarları"');
-    if (esitlemeVar()) esitle({sessiz: true});
+    if (esitlemeVar()) esitle({sessiz: true}).then(() => fazlaGistUyar());
 
     // ---------- Ana sekmeler ----------
     // Fitness / Koşu / Yüzme / Analiz. Adres çubuğundaki #kosu, #yuzme, #analiz açılışta o sekmeyi seçer.
