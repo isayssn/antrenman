@@ -1549,16 +1549,16 @@
       <form class="log-form" novalidate>
         <ol class="adimlar">
           <li>
-            <p><a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> sayfasında bir uygulama oluştur. "Authorization Callback Domain" alanına <code>localhost</code> yaz. Açılan sayfadaki Client ID ve Client Secret'ı buraya kopyala.</p>
+            <p><a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> sayfasında bir uygulama oluştur. "Authorization Callback Domain" alanına <code data-geri-alan>localhost</code> yaz (başında <code>http://</code> olmadan). Açılan sayfadaki Client ID ve Client Secret'ı buraya kopyala.</p>
             <div class="k-form-grid">
               <label><span>Client ID</span><input name="clientId" inputmode="numeric" autocomplete="off"></label>
               <label><span>Client Secret</span><input name="clientSecret" type="password" autocomplete="off"></label>
             </div>
           </li>
           <li>
-            <p>Aşağıdaki bağlantıyı aç ve Strava'da izin ver. Tarayıcı <code>localhost</code> adresine dönerken "sayfa açılamıyor" diyecek; sorun değil, o sayfanın adres çubuğundaki adresi kopyalayıp buraya yapıştır.</p>
-            <p><a class="btn-ghost" data-izin target="_blank" rel="noopener">Strava'da izin ver</a></p>
-            <div class="k-form-grid">
+            <p data-izin-not></p>
+            <p><a class="btn-ghost" data-izin rel="noopener">Strava'da izin ver</a></p>
+            <div class="k-form-grid" data-kod-alan>
               <label class="genis"><span>Dönen adres</span><input name="kod" autocomplete="off" placeholder="http://localhost/exchange_token?state=&amp;code=…"></label>
             </div>
           </li>
@@ -3765,11 +3765,30 @@
       strava.sonGuncelleme ? `son güncelleme ${gunAy.format(new Date(strava.sonGuncelleme))} ${saatDk.format(new Date(strava.sonGuncelleme))}` : '',
       ek].filter(Boolean).join(' · '));
 
+    // Sayfa bir adreste (http/https) duruyorsa Strava izinden sonra sayfanın kendisine döner ve kodu
+    // adresten okuruz — telefonda kopyala-yapıştır gerekmez. Dosyadan (file://) açıldığında bu mümkün
+    // olmadığı için eski yol kalıyor: localhost'a dönen adresi elle yapıştırmak.
+    const adresteMi = location.protocol === 'http:' || location.protocol === 'https:';
+    const geriAdres = () => adresteMi ? location.origin + location.pathname : 'http://localhost/exchange_token';
+    const geriAlan = () => adresteMi ? location.host : 'localhost';
     const izinAdresi = () => 'https://www.strava.com/oauth/authorize?client_id='
       + encodeURIComponent(sf.elements.clientId.value.trim())
-      + '&redirect_uri=' + encodeURIComponent('http://localhost/exchange_token')
+      + '&redirect_uri=' + encodeURIComponent(geriAdres())
       + '&response_type=code&approval_prompt=auto&scope=activity:read_all';
     sf.elements.clientId.addEventListener('input', () => { sq('[data-izin]').href = izinAdresi(); });
+    sq('[data-geri-alan]').textContent = geriAlan();
+    sq('[data-izin-not]').textContent = adresteMi
+      ? 'Aşağıdaki bağlantıyı aç ve Strava\'da izin ver. İzinden sonra bu sayfaya geri döneceksin, bağlantı kendiliğinden kurulacak.'
+      : 'Aşağıdaki bağlantıyı aç ve Strava\'da izin ver. Tarayıcı localhost adresine dönerken "sayfa açılamıyor" diyecek; sorun değil, o sayfanın adres çubuğundaki adresi kopyalayıp buraya yapıştır.';
+    sq('[data-kod-alan]').hidden = adresteMi;
+    if (adresteMi) sq('[data-izin]').removeAttribute('target');   // aynı sekmede gitsin ki geri dönebilsin
+    // İzne giderken kimlik bilgileri kaybolmasın: dönüşte kodu takas etmek için gerekiyorlar.
+    sq('[data-izin]').addEventListener('click', () => {
+      const id = sf.elements.clientId.value.trim(), gizli = sf.elements.clientSecret.value.trim();
+      if (!id || !gizli) return;
+      strava = {...strava, clientId: id, clientSecret: gizli};
+      stravaYaz();
+    });
 
     const stravaAc = () => {
       sf.elements.clientId.value = strava.clientId || '';
@@ -3914,34 +3933,57 @@
       return eklendi ? `${eklendi} yeni koşu eklendi.` : 'Yeni koşu yok.';
     };
 
+    const stravaBagla = async (id, gizli, kod) => {
+      const y = await fetch('https://www.strava.com/oauth/token', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({client_id: id, client_secret: gizli, grant_type: 'authorization_code', code: kod}),
+      });
+      if (!y.ok) throw new Error('İzin kodu kabul edilmedi. Kod tek kullanımlık, izni yeniden ver.');
+      const j = await y.json();
+      strava = {clientId: id, clientSecret: gizli, refreshToken: j.refresh_token, accessToken: j.access_token, expiresAt: j.expires_at};
+      stravaYaz();
+      sq('[data-strava="kaldir"]').hidden = false;
+      try {   // nabız bölgeleri Strava ayarından
+        const z = await stravaApi('/athlete/zones');
+        const b = z?.heart_rate?.zones;
+        if (Array.isArray(b) && b.length === 5) { depo.ayarlar.nabizBolgeleri = b.slice(1).map(x => x.min); depola(); }
+      } catch { /* alınamazsa varsayılan sınırlar kalır */ }
+      sMesaj('Bağlandı, koşular alınıyor…');
+      sMesaj(await stravaCek());
+    };
+
     sf.addEventListener('submit', async e => {
       e.preventDefault();
       const id = sf.elements.clientId.value.trim(), gizli = sf.elements.clientSecret.value.trim();
       const kod = (sf.elements.kod.value.match(/code=([^&\s]+)/) || [, sf.elements.kod.value.trim()])[1];
       if (!id || !gizli) return sMesaj('Client ID ve Client Secret gerekli.', true);
-      if (!kod) return sMesaj('İzin verdikten sonra dönen adresi yapıştır.', true);
+      if (!kod) return sMesaj(adresteMi ? 'Önce "Strava\'da izin ver"e bas.' : 'İzin verdikten sonra dönen adresi yapıştır.', true);
       sMesaj('Bağlanılıyor…');
       try {
-        const y = await fetch('https://www.strava.com/oauth/token', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({client_id: id, client_secret: gizli, grant_type: 'authorization_code', code: kod}),
-        });
-        if (!y.ok) throw new Error('İzin kodu kabul edilmedi. Kod tek kullanımlık, ikinci adımı tekrarla.');
-        const j = await y.json();
-        strava = {clientId: id, clientSecret: gizli, refreshToken: j.refresh_token, accessToken: j.access_token, expiresAt: j.expires_at};
-        stravaYaz();
-        sq('[data-strava="kaldir"]').hidden = false;
-        try {   // nabız bölgeleri Strava ayarından
-          const z = await stravaApi('/athlete/zones');
-          const b = z?.heart_rate?.zones;
-          if (Array.isArray(b) && b.length === 5) { depo.ayarlar.nabizBolgeleri = b.slice(1).map(x => x.min); depola(); }
-        } catch { /* alınamazsa varsayılan sınırlar kalır */ }
-        sMesaj('Bağlandı, koşular alınıyor…');
-        sMesaj(await stravaCek());
+        await stravaBagla(id, gizli, kod);
         setTimeout(() => sd.close(), 1200);   // sonuç zaten Koşu sekmesindeki durum satırında yazıyor
       } catch (h) { sMesaj(h.message, true); }
     });
+
+    // Strava'dan dönüş: adreste ?code=… varsa bağlantıyı kendimiz tamamlarız.
+    const stravaDonus = async () => {
+      const p = new URLSearchParams(location.search);
+      const kod = p.get('code'), hata = p.get('error');
+      if (!kod && !hata) return;
+      history.replaceState(null, '', location.pathname + location.hash);   // adres temizlensin
+      if (hata) return durum('Strava izni verilmedi.', true);
+      if (!strava.clientId || !strava.clientSecret) {
+        stravaAc();
+        return sMesaj('İzin geldi ama Client ID/Secret bulunamadı; bilgileri girip yeniden dene.', true);
+      }
+      stravaAc();
+      sMesaj('Bağlanılıyor…');
+      try {
+        await stravaBagla(strava.clientId, strava.clientSecret, kod);
+        setTimeout(() => sd.close(), 1500);
+      } catch (h) { sMesaj(h.message, true); }
+    };
 
     sq('[data-strava="kaldir"]').addEventListener('click', () => {
       strava = {};
@@ -3959,6 +4001,7 @@
       try { await stravaCek(); } catch (h) { durum(h.message, true); } finally { e.target.disabled = false; }
     });
     sonGuncellemeYaz(stravaBagli() ? '' : 'kurmak için düğmeye bas');
+    stravaDonus();
 
     // ---------- Eşitleme (GitHub gist) ----------
     // Kayıtlar gizli bir gist'te bir JSON dosyası olarak durur; her cihaz onu okuyup kendi verisiyle
