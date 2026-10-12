@@ -676,6 +676,8 @@
   .seg button + button{border-left:1.5px solid var(--rule);}
   .seg button:hover{background:var(--paper);}
   .seg button[aria-pressed="true"]{background:var(--ink);color:#fff;}
+  .bos-dugme{font-size:.82rem;padding:5px 11px;}
+  .bos-dugme[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;border-style:solid;}
   .k-not{font-size:.8rem;color:var(--ink-soft);align-self:center;}
   .esitle-durum{font-size:.82rem;color:var(--ink-soft);align-self:center;}
   .esitle-durum.is-error{color:var(--caution);}
@@ -1214,6 +1216,7 @@
       <button type="button" data-d="hafta" aria-pressed="true">Haftalık</button>
       <button type="button" data-d="ay" aria-pressed="false">Aylık</button>
     </div>
+    <button type="button" class="btn-ghost bos-dugme" data-bos aria-pressed="false">Boş dönemleri gizle</button>
     <span class="filtre-ad">Spor</span>
     <div class="seg" data-spor-filtre role="group" aria-label="Spor">
       <button type="button" data-s="hepsi" aria-pressed="true">Tümü</button>
@@ -1263,13 +1266,14 @@
         <button type="button" data-d="hafta" aria-pressed="true">Haftalık</button>
         <button type="button" data-d="ay" aria-pressed="false">Aylık</button>
       </div>
+      <button type="button" class="btn-ghost bos-dugme" data-bos aria-pressed="false">Boş dönemleri gizle</button>
     </div>
     <div class="grafikler">
       <figure class="k-fig">
         <h3>Haftalık koşular</h3>
         <p class="k-lejant"><span><i class="lj-kutu" style="--c:var(--kardiyo)"></i>Mesafe · sol eksen (km)</span><span><i class="lj-nokta" style="--c:var(--ink)"></i>Tempo · sağ eksen (/km)</span><span><i class="lj-cizgi" style="--c:var(--ink)"></i>Tempo seyri</span></p>
         <div class="chart" data-grafik="mesafe"><div class="chart-tip" hidden></div></div>
-        <p class="chart-note">Son 12 hafta ya da ay. Her sütun bir koşu; aynı dönemde birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), üstündeki nokta o koşunun temposu (sağdaki eksen, yukarısı daha hızlı); çizgi bütün noktaları sırayla birleştirir, arada koşulmayan hafta olsa da kesilmez. İki ölçünün ekseni ayrı — sütunla nokta arasındaki mesafenin bir anlamı yok. Sütuna ya da noktaya tıklamak ayrıntısını açar.</p>
+        <p class="chart-note">Program başlangıcından bugüne; haftalık ya da aylık. Her sütun bir koşu; aynı dönemde birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), üstündeki nokta o koşunun temposu (sağdaki eksen, yukarısı daha hızlı); çizgi bütün noktaları sırayla birleştirir, arada koşulmayan hafta olsa da kesilmez. İki ölçünün ekseni ayrı — sütunla nokta arasındaki mesafenin bir anlamı yok. Sütuna ya da noktaya tıklamak ayrıntısını açar.</p>
       </figure>
     </div>
     <ul class="rekorlar"></ul>
@@ -1294,13 +1298,14 @@
         <button type="button" data-d="hafta" aria-pressed="true">Haftalık</button>
         <button type="button" data-d="ay" aria-pressed="false">Aylık</button>
       </div>
+      <button type="button" class="btn-ghost bos-dugme" data-bos aria-pressed="false">Boş dönemleri gizle</button>
     </div>
     <div class="grafikler">
       <figure class="k-fig">
         <h3>Haftalık yüzmeler</h3>
         <p class="k-lejant"><span><i class="lj-kutu" style="--c:var(--kardiyo)"></i>Mesafe · sol eksen (m)</span><span><i class="lj-nokta" style="--c:var(--ink)"></i>Tempo · sağ eksen (/100 m)</span><span><i class="lj-cizgi" style="--c:var(--ink)"></i>Tempo seyri</span></p>
         <div class="chart" data-grafik="mesafe"><div class="chart-tip" hidden></div></div>
-        <p class="chart-note">Son 12 hafta ya da ay. Her sütun bir yüzme; aynı dönemde birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), üstündeki nokta o yüzmenun temposu (sağdaki eksen, yukarısı daha hızlı); çizgi bütün noktaları sırayla birleştirir, arada koşulmayan hafta olsa da kesilmez. İki ölçünün ekseni ayrı — sütunla nokta arasındaki mesafenin bir anlamı yok. Sütuna ya da noktaya tıklamak ayrıntısını açar.</p>
+        <p class="chart-note">Program başlangıcından bugüne; haftalık ya da aylık. Her sütun bir yüzme; aynı dönemde birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), üstündeki nokta o yüzmenun temposu (sağdaki eksen, yukarısı daha hızlı); çizgi bütün noktaları sırayla birleştirir, arada koşulmayan hafta olsa da kesilmez. İki ölçünün ekseni ayrı — sütunla nokta arasındaki mesafenin bir anlamı yok. Sütuna ya da noktaya tıklamak ayrıntısını açar.</p>
       </figure>
     </div>
     <ul class="rekorlar"></ul>
@@ -2273,30 +2278,43 @@
     const sonHaftalar = n => Array.from({length: n}, (_, i) => gunEkle(buHafta, -7 * (n - 1 - i)));   // eskiden yeniye
 
     // ---------- Dönem (haftalık / aylık) ----------
-    // Bütün grafikler "kova" listesiyle çizilir: haftalıkta 12 hafta, aylıkta 12 ay. Kova = başlangıç tarihi.
+    // Bütün grafikler "kova" listesiyle çizilir; kova = dönemin başlangıç tarihi.
+    // Eksen programın başladığı haftadan (BASLANGIC) bugüne uzanır — hem haftalıkta hem aylıkta.
+    // "Boş dönemleri gizle" açıkken her grafik kendi verisi olmayan kovaları atar (hangi kovanın
+    // dolu sayıldığı grafiğe göre değişir: koşu, yüzme, salon…).
     const ayKisa = new Intl.DateTimeFormat('tr-TR', {month: 'short'});
     const ayUzun = new Intl.DateTimeFormat('tr-TR', {month: 'long', year: 'numeric'});
     const ayBasi = d => new Date(d.getFullYear(), d.getMonth(), 1);
     const buAy = ayBasi(new Date());
+    const haftaBasi = d => gunEkle(d, -((d.getDay() + 6) % 7));
+    // Programın başladığı hafta: grafikler bundan öncesini hiç göstermez.
+    const BASLANGIC = '2026-07-27';
     const DONEM = {
       hafta: {
-        n: 12, ad: 'hafta', iyelik: 'haftanın', yonelme: 'haftaya', simdi: 'Bu hafta', enDarBant: 52,
+        ad: 'hafta', iyelik: 'haftanın', yonelme: 'haftaya', simdi: 'Bu hafta', enDarBant: 52,
+        sayi: () => Math.max(1, Math.round((buHafta - haftaBasi(tarihOku(BASLANGIC))) / (7 * GUN_MS)) + 1),
         bas: i => gunEkle(buHafta, -7 * i),
         icinde: (tarih, k) => haftadaMi(tarih, k),
         etiket: k => gunAy.format(k),
         tamEtiket: k => `${gunAy.format(k)} haftası`,
       },
       ay: {
-        n: 12, ad: 'ay', iyelik: 'ayın', yonelme: 'aya', simdi: 'Bu ay', enDarBant: 40,
+        ad: 'ay', iyelik: 'ayın', yonelme: 'aya', simdi: 'Bu ay', enDarBant: 40,
+        sayi: () => {
+          const b = ayBasi(tarihOku(BASLANGIC));
+          return Math.max(1, (buAy.getFullYear() - b.getFullYear()) * 12 + (buAy.getMonth() - b.getMonth()) + 1);
+        },
         bas: i => new Date(buAy.getFullYear(), buAy.getMonth() - i, 1),
         icinde: (tarih, k) => { const t = tarihOku(tarih); return t >= k && t < new Date(k.getFullYear(), k.getMonth() + 1, 1); },
         etiket: k => ayKisa.format(k),
         tamEtiket: k => ayUzun.format(k),
       },
     };
-    let donem = 'hafta';
+    let donem = 'hafta', bosGizle = false;
     const D = () => DONEM[donem];
-    const kovalar = () => Array.from({length: D().n}, (_, i) => D().bas(D().n - 1 - i));   // eskiden yeniye
+    const kovalar = () => { const n = D().sayi(); return Array.from({length: n}, (_, i) => D().bas(n - 1 - i)); };   // eskiden yeniye
+    // Grafiğin kendi "dolu mu" ölçütüyle boş kovaları atar; seçenek kapalıysa listeyi olduğu gibi verir.
+    const kovaSuz = (ks, dolu) => bosGizle ? ks.filter(dolu) : ks;
     const kovadaMi = (tarih, k) => D().icinde(tarih, k);
     // Son `adet` dönem (atla: kaç dönem geriden başlasın) içine düşen kayıtları seçen süzgeç.
     const sonDonemler = (adet, atla = 0) => {
@@ -2397,7 +2415,7 @@
       const adim = Math.ceil(D().enDarBant / bant);
       ks.forEach((k, i) => {
         if ((ks.length - 1 - i) % adim) return;
-        const simdi = i === ks.length - 1;
+        const simdi = +k === +D().bas(0);
         ciz('text', {x: P.l + bant * (i + .5), y: H - 8, 'text-anchor': 'middle', class: 'c-tick' + (simdi ? ' is-now' : '')}, svg)
           .textContent = simdi ? D().simdi : D().etiket(k);
       });
@@ -2694,7 +2712,9 @@
     // Antrenman takvimi: solda aktiviteler, altta dönemler. Kutu doluysa o dönemde yapılmış;
     // birden çok kez yapıldıysa kutuda sayı yazar. Salon satırında dönem = hafta ise en çok 1 beklenir.
     const izgaraCiz = () => {
-      const ks = kovalar();
+      const tumKayit = [...Object.values(depo.kayitlar).flat().map(x => x.tarih),
+        ...siraliKardiyo().map(x => x.tarih), ...Object.keys(depo.beslenme || {})];
+      const ks = kovaSuz(kovalar(), k => tumKayit.some(t => kovadaMi(t, k)));
       const satirlar = [];
       if (sporSuzgec === 'hepsi' || sporSuzgec === 'salon') SALON.forEach(([id, ad]) => satirlar.push({
         ad, sinif: id === 'bacak' ? 'is-alt' : '',
@@ -2759,11 +2779,16 @@
     // bir bölge seçilince o bölgenin hareketleri, bir hareket seçilince yalnız o kalır.
     let bgBolge = 'hepsi', bgHareket = null, bgTumu = false;
 
+    // Bölge grafiğinin kovaları: seçili kapsamda kaydı olan dönemler (gizleme açıksa).
+    const bgKovalar = () => {
+      const anahtarlar = (bgHareket && hareketler[bgHareket] ? [bgHareket] : bgHareketler().map(([a]) => a));
+      return kovaSuz(kovalar(), k => anahtarlar.some(a => seanslar(a).some(x => kovadaMi(x.tarih, k))));
+    };
     const bgHareketler = () => Object.entries(hareketler)
       .filter(([anahtar, h]) => seanslar(anahtar).length && (bgBolge === 'hepsi' || bolgeBul(h) === bgBolge));
 
     const bgSeriler = () => {
-      const ks = kovalar();
+      const ks = bgKovalar();
       const liste = bgHareket && hareketler[bgHareket] ? [[bgHareket, hareketler[bgHareket]]] : bgHareketler();
       return liste.map(([anahtar, h]) => ({
         anahtar, h, ad: h.ex.querySelector('.ex-name').textContent, bolge: bolgeBul(h),
@@ -2778,7 +2803,7 @@
 
     const bgGrafikCiz = seriler => {
       const kutu = document.querySelector('[data-grafik="bolge"]'), tip = kutu.querySelector('.chart-tip');
-      const ks = kovalar(), n = ks.length;
+      const ks = bgKovalar(), n = ks.length;
       const az = seriler.length <= 6;
       const H = 240, P = {l: 52, r: az ? 78 : 30, t: 20, b: 28};
       const {svg, W} = svgHazirla(kutu, H);
@@ -3039,7 +3064,9 @@
     // yalnızca mesafe ekseninin, tempo ekseni sağda kendi etiketleriyle durur. Tıklanınca detay açılır.
     const sporGrafik = tur => {
       const S = SPOR[tur], kok = sporKok(tur);
-      const ks = kovalar(), n = ks.length;
+      const liste0 = sporListe(tur);
+      const ks = kovaSuz(kovalar(), k => liste0.some(x => kovadaMi(x.tarih, k)));
+      const n = ks.length;
       kok.querySelector('.k-fig h3').textContent = `${donem === 'hafta' ? 'Haftalık' : 'Aylık'} ${tur === 'kosu' ? 'koşular' : 'yüzmeler'}`;
       const kutu = kok.querySelector('[data-grafik="mesafe"]'), tip = kutu.querySelector('.chart-tip');
       const P = {l: 44, r: 52, t: 26, b: 28};
@@ -3171,6 +3198,15 @@
     };
     Object.keys(SPOR).forEach(tur => sporKok(tur).querySelector('.tumu-k')
       .addEventListener('click', () => { tumuAcik[tur] = !tumuAcik[tur]; sporTablo(tur); }));
+
+    // Boş dönem seçeneği de ortak: her grafik kendi "dolu" ölçütüyle süzer.
+    document.querySelectorAll('[data-bos]').forEach(b => b.addEventListener('click', () => {
+      bosGizle = !bosGizle;
+      document.querySelectorAll('[data-bos]').forEach(x => x.setAttribute('aria-pressed', String(bosGizle)));
+      sporCiz('kosu');
+      sporCiz('yuzme');
+      gelisimCiz();
+    }));
 
     // Dönem seçici bütün sekmelerde ortak: birinde değişince hepsi yeniden çizilir.
     document.querySelectorAll('[data-donem] button').forEach(b => b.addEventListener('click', () => {
