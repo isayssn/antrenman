@@ -361,7 +361,7 @@
   .sec-head h3{font-size:1.15rem;font-weight:500;}
   .sec-count{font-size:.8rem;color:var(--ink-soft);}
 
-  .seg{display:inline-flex;gap:2px;padding:2px;background:var(--surface);border:1px solid var(--rule);border-radius:2px;}
+  .seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;background:var(--surface);border:1px solid var(--rule);border-radius:2px;}
   .seg button{font:inherit;font-size:.78rem;color:var(--ink-soft);background:none;border:0;border-radius:1px;padding:4px 10px;cursor:pointer;}
   .seg button[aria-checked="true"]{background:var(--ink);color:#fff;}
 
@@ -1385,7 +1385,8 @@
         <div class="sec-head">
           <h3 id="ilerleme-baslik">İlerleme</h3>
           <div class="seg" role="radiogroup" aria-label="Grafikte gösterilen">
-            <button type="button" role="radio" aria-checked="true" data-olcu="kg">En ağır set</button>
+            <button type="button" role="radio" aria-checked="true" data-olcu="ort">Ortalama kg</button>
+            <button type="button" role="radio" aria-checked="false" data-olcu="kg">En ağır set</button>
             <button type="button" role="radio" aria-checked="false" data-olcu="e1rm">Tahmini 1TM</button>
           </div>
         </div>
@@ -1856,7 +1857,14 @@
     const cizelge = $('.chart');
     const ipucu = $('.chart-tip');
     let aktif = null;        // {ex, anahtar, plan}
-    let olcu = 'kg';         // grafikte: "kg" en ağır set, "e1rm" tahmini 1TM
+    let olcu = 'ort';        // grafikte: "ort" ortalama ağırlık, "kg" en ağır set, "e1rm" tahmini 1TM
+    // Ortalama ağırlık = Σ(kg × tekrar) / Σ(tekrar). Tek bir zorlanarak çıkarılan set yerine
+    // seansın tamamını temsil eder; 0,1 kg'a yuvarlanır.
+    const ortalamaKg = seans => {
+      const tekrar = seans.setler.reduce((t, x) => t + x.tekrar, 0);
+      if (!tekrar) return 0;
+      return Math.round(seans.setler.reduce((t, x) => t + x.kg * x.tekrar, 0) / tekrar * 10) / 10;
+    };
     let duzenlenen = null;   // formda düzenlenen kaydın tarihi
 
     document.querySelectorAll('.ex').forEach(ex => {
@@ -1978,16 +1986,16 @@
       const enIyi = liste.reduce((a, s) => !a || enAgir(s).kg > enAgir(a).kg ? s : a, null);
       let degisim = ['—', 'iki antrenmandan sonra'];
       if (liste.length > 1) {
-        const fark = sonSet.kg - enAgir(ilk).kg;
+        const fark = ortalamaKg(son) - ortalamaKg(ilk);
         const gun = Math.round((tarihOku(son.tarih) - tarihOku(ilk.tarih)) / GUN_MS);
-        degisim = [(fark > 0 ? '+' : fark < 0 ? '−' : '') + nf.format(Math.abs(fark)) + ' kg',
-          `ilk kayıttan beri · ${gun >= 14 ? Math.round(gun / 7) + ' hafta' : gun + ' gün'}`];
+        degisim = [(fark > 0.05 ? '+' : fark < -0.05 ? '−' : '') + nf.format(Math.abs(Math.round(fark * 10) / 10)) + ' kg',
+          `ortalama ağırlıkta · ${gun >= 14 ? Math.round(gun / 7) + ' hafta' : gun + ' gün'}`];
       }
       const kutular = [
-        ['Son antrenman', sonSet ? nf.format(sonSet.kg) + ' kg' : '—', sonSet
-          ? `${sonSet.tekrar} tekrar${sonSet.rir != null ? ' · RiR ' + sonSet.rir : ''} · ${gunAy.format(tarihOku(son.tarih))}`
+        ['Son antrenman', son ? nf.format(ortalamaKg(son)) + ' kg' : '—', son
+          ? `ortalama · en ağır ${nf.format(sonSet.kg)} kg × ${sonSet.tekrar} · ${gunAy.format(tarihOku(son.tarih))}`
           : 'henüz kayıt yok'],
-        ['En iyi', enIyi ? nf.format(enAgir(enIyi).kg) + ' kg' : '—', enIyi ? gunAy.format(tarihOku(enIyi.tarih)) : ''],
+        ['En iyi set', enIyi ? nf.format(enAgir(enIyi).kg) + ' kg' : '—', enIyi ? gunAy.format(tarihOku(enIyi.tarih)) : ''],
         ['Değişim', ...degisim],
         ['Tahmini 1TM', son ? nf.format(yarim(Math.max(...son.setler.map(epley)))) + ' kg' : '—', 'tek tekrarda kaldırabileceğin'],
       ];
@@ -2021,6 +2029,7 @@
       return cizgiler;
     };
     const NOT = {
+      ort: 'Her nokta bir antrenmanın ortalama ağırlığı: bütün setlerin ağırlık × tekrar toplamı, toplam tekrara bölünür. Zorlanarak çıkarılan tek bir set grafiği tek başına yukarı çekmez.',
       kg: 'Her nokta bir antrenmanın en ağır seti.',
       e1rm: 'Her nokta, o antrenmanın en iyi setinden hesaplanan tahmini tek tekrar maksimumu (Epley). Aynı ağırlıkta daha çok tekrar da yükseltir.',
     };
@@ -2037,7 +2046,9 @@
 
       const W = cizelge.clientWidth - 8, H = 230, P = {l: 42, r: 20, t: 26, b: 30};
       cizimGenisligi = cizelge.clientWidth;
-      const deger = s => olcu === 'kg' ? enAgir(s).kg : yarim(Math.max(...s.setler.map(epley)));
+      const deger = s => olcu === 'ort' ? ortalamaKg(s)
+        : olcu === 'kg' ? enAgir(s).kg
+        : yarim(Math.max(...s.setler.map(epley)));
       const noktalar = liste.map(s => ({s, t: tarihOku(s.tarih).getTime(), v: deger(s)}));
       let t0 = noktalar[0].t, t1 = noktalar.at(-1).t;
       if (t1 - t0 < GUN_MS) { t0 -= 3 * GUN_MS; t1 += 3 * GUN_MS; }
