@@ -677,6 +677,13 @@
   .esitle-durum{font-size:.82rem;color:var(--ink-soft);align-self:center;}
   .esitle-durum.is-error{color:var(--caution);}
   .iyimser{color:var(--ink-soft);font-weight:400;}
+  .jeton-alan{display:flex;gap:6px;}
+  .jeton-alan input{flex:1;min-width:0;}
+  .jeton-goster{
+    flex:none;padding:0 10px;font:inherit;font-size:.78rem;color:var(--ink-soft);cursor:pointer;
+    background:#fff;border:1px solid var(--rule);border-radius:2px;
+  }
+  .jeton-goster:hover{border-color:var(--ink);color:var(--ink);}
   .detail--dar{width:min(560px,100%);}
   .adimlar{margin:0;padding:0 0 0 22px;display:grid;gap:22px;}
   .adimlar li{padding-left:4px;}
@@ -1321,12 +1328,17 @@
     <div class="detail-body">
       <ol class="adimlar">
         <li><a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Antrenman%20sayfasi" target="_blank" rel="noopener">GitHub jetonu oluştur</a> — açılan sayfada yalnız <b>gist</b> izni işaretli gelir, süreyi uzun seç ve "Generate token" de.</li>
-        <li>Jetonu aşağıya yapıştır. <b>İlk cihazda</b> gist alanını boş bırak, sayfa gizli bir gist açar.</li>
-        <li><b>İkinci cihazda</b> aynı jetonu ve buradaki gist kimliğini gir; iki cihaz aynı kaydı görür.</li>
+        <li>Jetonu aşağıya yapıştır ve <b>gist alanını boş bırak</b>: sayfa hesabındaki antrenman gist'ini bulur, yoksa gizli bir tane açar.</li>
+        <li><b>Diğer cihazda</b> aynı adımları tekrarla. Jetonun aynı olması gerekmez — her cihaz kendi jetonunu üretebilir; <b>önemli olan gist'in aynı olması</b>. Durum satırındaki kısa kod (ör. <code>ef953ec</code>) iki cihazda da aynıysa doğrudur.</li>
       </ol>
       <form class="log-form esitle-form" novalidate>
         <div class="k-form-grid">
-          <label class="genis"><span>GitHub jetonu</span><input name="jeton" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…"></label>
+          <label class="genis"><span>GitHub jetonu</span>
+            <span class="jeton-alan">
+              <input name="jeton" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…">
+              <button type="button" class="jeton-goster" aria-pressed="false">Göster</button>
+            </span>
+          </label>
           <label class="genis"><span>Gist kimliği ya da adresi <span class="iyimser">(ilk cihazda boş bırak)</span></span><input name="gist" autocomplete="off" spellcheck="false" placeholder="https://gist.github.com/…"></label>
         </div>
         <div class="log-actions">
@@ -4084,6 +4096,13 @@
       m.textContent = metin;
       m.classList.toggle('is-error', !!hata);
     };
+    eq('.jeton-goster').addEventListener('click', e => {
+      const alan = ef.elements.jeton;
+      const acik = alan.type === 'text';
+      alan.type = acik ? 'password' : 'text';
+      e.target.textContent = acik ? 'Göster' : 'Gizle';
+      e.target.setAttribute('aria-pressed', String(!acik));
+    });
     const esitleAc = () => {
       ef.elements.jeton.value = esitleme.jeton || '';
       ef.elements.gist.value = esitleme.gist || '';
