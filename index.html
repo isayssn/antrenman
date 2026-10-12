@@ -2896,22 +2896,28 @@
       // Aynı dönemde üst üste binmesinler diye noktalar dikeyde sıralanıp en az 13px aralıkla yerleşir.
       const toplamNokta = seriler.reduce((t, x) => t + x.dolu.length, 0);
       const hepsi = az && toplamNokta <= 28;
-      const etiketYaz = (x, y, metin, renk, sol) => {
-        const t = ciz('text', {x: sol ? x - 7 : x + 7, y: y + 4, class: 'c-val',
-          'text-anchor': sol ? 'end' : 'start'}, svg);
+      const etiketYaz = (x, y, metin, renk, hiza) => {
+        const t = ciz('text', {x, y, class: 'c-val', 'text-anchor': hiza}, svg);
         t.setAttribute('fill', renk);
         t.textContent = metin;
       };
       if (hepsi) {
+        // Etiket çizginin üstüne binmesin: nokta komşularına göre tepedeyse yazı üste, çukurdaysa alta
+        // gider (eğrinin dış tarafı). Aynı dönemde birden çok etiket varsa 13px aralıkla ayrılır.
         ks.forEach((k, i) => {
-          const ayni = seriler.map(seri => ({seri, p: seri.dolu.find(o => o.i === i)}))
-            .filter(o => o.p).sort((a, b) => Y(a.p.v) - Y(b.p.v));
-          let oncekiY = -99;
-          ayni.forEach(({seri, p}) => {
-            const y = Math.max(Y(p.v) - 9, oncekiY + 13);
-            oncekiY = y;
-            etiketYaz(X(p.i), y, `${nf.format(p.v)}`, seri.renk, i === ks.length - 1);
-          });
+          const hiza = i === 0 ? 'start' : i === ks.length - 1 ? 'end' : 'middle';
+          const x = i === 0 ? X(i) - 4 : i === ks.length - 1 ? X(i) + 4 : X(i);
+          const ayni = seriler.map(seri => {
+            const j = seri.dolu.findIndex(o => o.i === i);
+            if (j < 0) return null;
+            const komsular = [seri.dolu[j - 1], seri.dolu[j + 1]].filter(Boolean).map(o => Y(o.v));
+            const komsuY = komsular.length ? komsular.reduce((t, v) => t + v, 0) / komsular.length : Infinity;
+            return {seri, p: seri.dolu[j], yukari: komsuY >= Y(seri.dolu[j].v)};
+          }).filter(Boolean);
+          ayni.filter(o => o.yukari).sort((a, b) => Y(a.p.v) - Y(b.p.v))
+            .forEach((o, n) => etiketYaz(x, Y(o.p.v) - 11 - n * 13, nf.format(o.p.v), o.seri.renk, hiza));
+          ayni.filter(o => !o.yukari).sort((a, b) => Y(b.p.v) - Y(a.p.v))
+            .forEach((o, n) => etiketYaz(x, Y(o.p.v) + 18 + n * 13, nf.format(o.p.v), o.seri.renk, hiza));
         });
       } else if (az) {
         const etiketler = seriler.map(s => ({s, p: s.dolu.at(-1)})).filter(o => o.p).sort((a, b) => Y(a.p.v) - Y(b.p.v));
@@ -2919,7 +2925,7 @@
         etiketler.forEach(({s, p}) => {
           const y = Math.max(Y(p.v), oncekiY + 13);
           oncekiY = y;
-          etiketYaz(X(p.i), y, `${nf.format(p.v)} kg`, s.renk, true);
+          etiketYaz(X(p.i) - 7, y + 4, `${nf.format(p.v)} kg`, s.renk, 'end');
         });
       }
       kovaEtiketleri(svg, H, P, ks, bant);
