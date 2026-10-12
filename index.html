@@ -2872,17 +2872,21 @@
         else if (dolu.length === 1) ciz('circle', {cx: X(dolu[0].i), cy: Y(dolu[0].v), r: 2.5, fill: renk}, svg);
         seri.dolu = dolu;
         seri.renk = renk;
-        // Çizgi üstünde gezinince hangi hareket olduğu yazsın (renk tek başına ayırt etmeye yetmez).
+        // Çizgi üstünde gezinince hangi hareket olduğu ve imlecin bulunduğu DÖNEMİN değeri yazsın
+        // (renk tek başına ayırt etmeye yetmez; hep son noktayı göstermek de yanıltıyordu).
         if (d) {
           const hit = ciz('path', {d, fill: 'none', stroke: 'transparent', 'stroke-width': 14, class: 'c-hit'}, svg);
           const goster = e => {
-            const son = dolu.at(-1);
-            tipDoldur(tip, seri.ad, BOLGELER.find(([id]) => id === seri.bolge)?.[1] || '',
-              [`Son ortalama: ${nf.format(son.v)} kg`, `En ağır set ${nf.format(son.enAgir)} kg × ${son.tekrar}`,
-                `${dolu.length} dönemde kayıt var`]);
-            tipKonum(kutu, tip, X(son.i), Y(son.v));
+            const r = svg.getBoundingClientRect();
+            const mx = (e.clientX - r.left) * (W / r.width);
+            const p = dolu.reduce((en, o) => Math.abs(X(o.i) - mx) < Math.abs(X(en.i) - mx) ? o : en, dolu[0]);
+            tipDoldur(tip, seri.ad, `${BOLGELER.find(([id]) => id === seri.bolge)?.[1] || ''} · ${D().tamEtiket(ks[p.i])}`,
+              [`Ortalama ${nf.format(p.v)} kg`, `En ağır set ${nf.format(p.enAgir)} kg × ${p.tekrar}${p.rir != null ? ' · RiR ' + p.rir : ''}`,
+                p.seans > 1 ? `${p.seans} antrenman` : '', `${dolu.length} dönemde kayıt var`].filter(Boolean));
+            tipKonum(kutu, tip, X(p.i), Y(p.v));
           };
           hit.addEventListener('pointerenter', goster);
+          hit.addEventListener('pointermove', goster);
           hit.addEventListener('pointerdown', goster);
           mouseCikinca(hit, () => { tip.hidden = true; });
         }
