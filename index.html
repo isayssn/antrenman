@@ -3211,6 +3211,8 @@
       // Mesafe etiketi her sütuna yazılır. Sütunlar sıkışıksa ondalık atılır ("14,1" yerine "14");
       // o da sığmıyorsa etiket atlanır. Genişlik 11px yazıda karakter başına ~6,2px sayılır.
       const kisaYaz = m => nf.format(Math.round(m / S.olcek));
+      const yerlesik = [];   // yazılmış etiketlerin kutuları: {x1, x2, y}
+      const cakisirMi = (x1, x2, y) => yerlesik.some(k => x1 < k.x2 && x2 > k.x1 && Math.abs(k.y - y) < 12);
       let oncekiSag = -Infinity;
       kayitlar.forEach((o, idx) => {
         const solBosluk = o.cx - (kayitlar[idx - 1]?.cx ?? -1e9);
@@ -3221,6 +3223,7 @@
         if (o.cx - yari < oncekiSag + 3) return;
         oncekiSag = o.cx + yari;
         o.etiketli = true;
+        yerlesik.push({x1: o.cx - yari, x2: o.cx + yari, y: o.yM - 6});
         ciz('text', {x: o.cx, y: o.yM - 6, 'text-anchor': 'middle', class: 'c-val'}, svg).textContent = metin;
       });
 
@@ -3231,15 +3234,15 @@
         {d: kayitlar.map((o, j) => `${j ? 'L' : 'M'}${o.cx.toFixed(1)},${o.yT.toFixed(1)}`).join(''), class: 'c-line2'}, svg);
       kayitlar.forEach(o => ciz('circle',
         {cx: o.cx, cy: o.yT, r: 4.5, fill: 'var(--ink)', stroke: 'var(--surface)', 'stroke-width': 2}, svg));
-      // Tempo etiketleri: nokta sütun tepesinden yukarıdaysa üste, değilse noktanın altına yazılır.
-      let sonTempoX = -Infinity;
+      // Tempo etiketi HER noktaya yazılır. Önce noktanın üstü denenir, sonra altı, sonra biraz daha
+      // uzağı; mesafe etiketleriyle ve birbirleriyle çakışmayan ilk yer seçilir.
       kayitlar.forEach(o => {
-        if (o.cx - sonTempoX < 32) return;
-        sonTempoX = o.cx;
-        // Noktanın üstünde yer varsa oraya, yoksa altına (sütunun içine) — zemin halesi okunur tutuyor.
-        const yer = !o.etiketli || o.yM - o.yT >= 22;
-        ciz('text', {x: o.cx, y: yer ? o.yT - 10 : o.yT + 17, 'text-anchor': 'middle', class: 'c-val'}, svg)
-          .textContent = sureYaz(o.tempo);
+        const metin = sureYaz(o.tempo);
+        const yari = metin.length * 3.1 + 1;
+        const adaylar = [o.yT - 10, o.yT + 17, o.yT - 23, o.yT + 30];
+        const y = adaylar.find(c => !cakisirMi(o.cx - yari, o.cx + yari, c)) ?? adaylar[1];
+        yerlesik.push({x1: o.cx - yari, x2: o.cx + yari, y});
+        ciz('text', {x: o.cx, y, 'text-anchor': 'middle', class: 'c-val'}, svg).textContent = metin;
       });
       kovaEtiketleri(svg, H, P, ks, bant);
 
