@@ -644,6 +644,8 @@
   .bg-hareket.is-secili td{background:#fff;}
   .bg-hareket.is-secili td:first-child{box-shadow:inset 3px 0 0 var(--day);}
   .bg-hareket .akt-ad{font-size:.9rem;}
+  .bg-hareket.is-bos td{color:var(--ink-soft);}
+  .bg-hareket.is-bos .akt-ad{color:var(--ink-soft);}
   .hg-tablo{width:100%;border-collapse:collapse;font-size:.88rem;}
   .hg-tablo th{padding:6px 12px 6px 0;font-size:.76rem;font-weight:500;color:var(--ink-soft);text-align:left;white-space:nowrap;border-bottom:1.5px solid var(--rule);}
   .hg-tablo td{padding:8px 12px 8px 0;white-space:nowrap;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--rule);vertical-align:middle;}
@@ -2338,8 +2340,14 @@
     let donem = 'hafta', bosGizle = false;
     const D = () => DONEM[donem];
     const kovalar = () => { const n = D().sayi(); return Array.from({length: n}, (_, i) => D().bas(n - 1 - i)); };   // eskiden yeniye
-    // Grafiğin kendi "dolu mu" ölçütüyle boş kovaları atar; seçenek kapalıysa listeyi olduğu gibi verir.
-    const kovaSuz = (ks, dolu) => bosGizle ? ks.filter(dolu) : ks;
+    // Grafiğin kendi "dolu mu" ölçütüyle kovaları süzer. Seçenek açıkken bütün boşlar atılır;
+    // kapalıyken yalnız BAŞTAKİ boş dönemler atılır — her grafik kendi ilk kaydından başlasın diye
+    // (salon kayıtları 21 Eylül'de başlıyorsa bölge grafiği temmuzdan değil oradan başlar).
+    const kovaSuz = (ks, dolu) => {
+      if (bosGizle) return ks.filter(dolu);
+      const ilk = ks.findIndex(dolu);
+      return ilk <= 0 ? ks : ks.slice(ilk);
+    };
     const kovadaMi = (tarih, k) => D().icinde(tarih, k);
     // Son `adet` dönem (atla: kaç dönem geriden başlasın) içine düşen kayıtları seçen süzgeç.
     const sonDonemler = (adet, atla = 0) => {
@@ -2720,15 +2728,16 @@
       const salonSay = pzt => SALON.filter(([id]) => salonYapildi(id, pzt)).length;
       const kardiyoBu = sporSuzgec === 'salon' ? 0 : siraliKardiyo().filter(k => haftadaMi(k.tarih, buHafta)).length;
       const onceki4 = sonHaftalar(5).slice(0, 4).reduce((t, pzt) => t + salonSay(pzt), 0);
+      // Özet kutusu da ortalama ağırlıktan: grafik, tablo ve detay ekranıyla aynı ölçü.
       const degisimler = Object.keys(hareketler).map(seanslar).filter(l => l.length > 1)
-        .map(l => (seansGucu(l.at(-1)) / seansGucu(l[0]) - 1) * 100);
+        .map(l => (ortalamaKg(l.at(-1)) / ortalamaKg(l[0]) - 1) * 100);
       const genel = ortalama(degisimler);
       const hacimler = kovalar().map(k => seansHacmiTop(tumSeanslar().filter(s => kovadaMi(s.tarih, k))));
       const [onceki, son] = [hacimler.at(-2) || 0, hacimler.at(-1) || 0];
       kutular.replaceChildren(
         statKutu('Bu hafta', `${salonSay(buHafta)}/4`, 'salon antrenmanı' + (kardiyoBu ? ` · ${kardiyoBu} koşu/yüzme` : '')),
         statKutu('Önceki 4 hafta', `${onceki4}/16`, `salon antrenmanı · %${Math.round(onceki4 / 16 * 100)}`),
-        statKutu('Güç', genel === null ? '—' : yuzde(genel), 'ilk kayda göre, hareketlerin ortalaması'),
+        statKutu('Ortalama ağırlık', genel === null ? '—' : yuzde(genel), 'ilk kayda göre, hareketlerin ortalaması'),
         statKutu(`${D().iyelik.replace(/^./, c => c.toUpperCase())} hacmi`, `${nf.format(+(son / 1000).toFixed(1))} t`,
           onceki ? `önceki ${D().yonelme} göre ${yuzde((son / onceki - 1) * 100)}` : 'set × tekrar × kg'),
       );
@@ -2806,11 +2815,14 @@
 
     // Bölge grafiğinin kovaları: seçili kapsamda kaydı olan dönemler (gizleme açıksa).
     const bgKovalar = () => {
-      const anahtarlar = (bgHareket && hareketler[bgHareket] ? [bgHareket] : bgHareketler().map(([a]) => a));
+      const anahtarlar = (bgHareket && hareketler[bgHareket] ? [bgHareket] : bgHareketler().map(([a]) => a))
+        .filter(a => seanslar(a).length);
       return kovaSuz(kovalar(), k => anahtarlar.some(a => seanslar(a).some(x => kovadaMi(x.tarih, k))));
     };
+    // Kapsam: programdaki bütün hareketler. Hiç yapılmamış olanlar listede durur (grafiğe çizilmez),
+    // yoksa "bu hareket programda var mı?" sorusu listeden cevaplanamıyordu.
     const bgHareketler = () => Object.entries(hareketler)
-      .filter(([anahtar, h]) => seanslar(anahtar).length && (bgBolge === 'hepsi' || bolgeBul(h) === bgBolge));
+      .filter(([, h]) => bgBolge === 'hepsi' || bolgeBul(h) === bgBolge);
 
     const bgSeriler = () => {
       const ks = bgKovalar();
@@ -2820,8 +2832,10 @@
         noktalar: ks.map(k => {
           const ic = seanslar(anahtar).filter(s => kovadaMi(s.tarih, k));
           if (!ic.length) return null;
+          // Dönemde birden çok seans varsa en iyisini değil, hepsinin ortalamasını alırız.
+          const kg = ic.reduce((t, x) => t + ortalamaKg(x), 0) / ic.length;
           const e = ic.map(enAgir).reduce((a, b) => b.kg > a.kg || (b.kg === a.kg && b.tekrar > a.tekrar) ? b : a);
-          return {v: e.kg, tekrar: e.tekrar, rir: e.rir, seans: ic.length};
+          return {v: Math.round(kg * 10) / 10, tekrar: e.tekrar, rir: e.rir, seans: ic.length, enAgir: e.kg};
         }),
       })).filter(seri => seri.noktalar.some(Boolean));
     };
@@ -2849,17 +2863,13 @@
 
       seriler.forEach(seri => {
         const renk = `var(--b-${seri.bolge})`;
+        // Çizgi bütün noktaları sırayla birleştirir; arada o hareketi yapmadığın dönem olsa da kesilmez.
         const dolu = seri.noktalar.map((p, i) => p && {...p, i}).filter(Boolean);
-        const parcalar = [];
-        dolu.forEach(p => {
-          const son = parcalar.at(-1);
-          if (son && p.i - son.at(-1).i === 1) son.push(p); else parcalar.push([p]);
-        });
-        const d = parcalar.filter(p => p.length > 1)
-          .map(p => p.map((o, j) => `${j ? 'L' : 'M'}${X(o.i).toFixed(1)},${Y(o.v).toFixed(1)}`).join('')).join(' ');
+        const d = dolu.length > 1
+          ? dolu.map((o, j) => `${j ? 'L' : 'M'}${X(o.i).toFixed(1)},${Y(o.v).toFixed(1)}`).join('') : '';
         if (d) ciz('path', {d, fill: 'none', stroke: renk, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, svg);
         if (az) dolu.forEach(p => ciz('circle', {cx: X(p.i), cy: Y(p.v), r: 3.5, fill: renk, stroke: 'var(--surface)', 'stroke-width': 2}, svg));
-        else parcalar.filter(p => p.length === 1).forEach(p => ciz('circle', {cx: X(p[0].i), cy: Y(p[0].v), r: 2.5, fill: renk}, svg));
+        else if (dolu.length === 1) ciz('circle', {cx: X(dolu[0].i), cy: Y(dolu[0].v), r: 2.5, fill: renk}, svg);
         seri.dolu = dolu;
         seri.renk = renk;
         // Çizgi üstünde gezinince hangi hareket olduğu yazsın (renk tek başına ayırt etmeye yetmez).
@@ -2868,7 +2878,8 @@
           const goster = e => {
             const son = dolu.at(-1);
             tipDoldur(tip, seri.ad, BOLGELER.find(([id]) => id === seri.bolge)?.[1] || '',
-              [`Son: ${nf.format(son.v)} kg × ${son.tekrar}`, `${dolu.length} dönemde kayıt var`]);
+              [`Son ortalama: ${nf.format(son.v)} kg`, `En ağır set ${nf.format(son.enAgir)} kg × ${son.tekrar}`,
+                `${dolu.length} dönemde kayıt var`]);
             tipKonum(kutu, tip, X(son.i), Y(son.v));
           };
           hit.addEventListener('pointerenter', goster);
@@ -2898,8 +2909,9 @@
           const p = seri.noktalar[i];
           const hit = ciz('rect', {x: P.l + bant * i, y: P.t, width: bant, height: taban - P.t, class: 'c-hit'}, svg);
           const goster = () => {
-            tipDoldur(tip, D().tamEtiket(k), p ? `${nf.format(p.v)} kg × ${p.tekrar}` : 'kayıt yok',
-              p ? [p.rir != null ? `RiR ${p.rir}` : '', `${p.seans} kayıt`].filter(Boolean) : []);
+            tipDoldur(tip, D().tamEtiket(k), p ? `Ortalama ${nf.format(p.v)} kg` : 'kayıt yok',
+              p ? [`En ağır set ${nf.format(p.enAgir)} kg × ${p.tekrar}${p.rir != null ? ' · RiR ' + p.rir : ''}`,
+                `${p.seans} kayıt`] : []);
             tipKonum(kutu, tip, X(i), p ? Y(p.v) : P.t);
           };
           hit.addEventListener('pointerenter', goster);
@@ -2911,8 +2923,7 @@
 
     const bolgeGelisimCiz = () => {
       const kok = document.querySelector('[data-grafik="bolge"]').closest('figure');
-      const varOlan = BOLGELER.filter(([id]) => Object.entries(hareketler)
-        .some(([anahtar, h]) => seanslar(anahtar).length && bolgeBul(h) === id));
+      const varOlan = BOLGELER.filter(([id]) => Object.values(hareketler).some(h => bolgeBul(h) === id));
       if (!varOlan.some(([id]) => id === bgBolge)) bgBolge = 'hepsi';
       const cipYap = (ad, secili, tikla, {renk = '', ilk = false} = {}) => {
         const li = document.createElement('li');
@@ -2948,39 +2959,43 @@
 
       const seriler = bgSeriler();
       kok.querySelector('.bg-eksen').textContent = seriler.length === 1
-        ? `${seriler[0].ad} · en ağır set (kg)`
-        : `En ağır set (kg) · ${seriler.length} hareket`;
+        ? `${seriler[0].ad} · ortalama ağırlık (kg)`
+        : `Ortalama ağırlık (kg) · ${seriler.length} hareket`;
       bgGrafikCiz(seriler);
 
       // Tablo: seçili kapsamın hareketleri. Satıra basınca hareketin kg/tekrar geçmişi açılır.
       const donemIci = s => kovalar().some(k => kovadaMi(s.tarih, k));
+      // Güç seyri ve değişim de ortalama ağırlıktan hesaplanır — grafikle ve detay ekranıyla aynı dil.
       const satirlar = hl.map(([anahtar, h]) => {
-        const l = seanslar(anahtar), g = l.map(seansGucu);
+        const l = seanslar(anahtar), g = l.map(ortalamaKg);
         const ic = l.filter(donemIci);
         return {anahtar, h, l, g, bolge: bolgeBul(h), degisim: l.length > 1 ? (g.at(-1) / g[0] - 1) * 100 : null,
           set: ic.reduce((t, s) => t + s.setler.length, 0)};
-      }).sort((a, b) => (b.degisim ?? -1e9) - (a.degisim ?? -1e9));
+      }).sort((a, b) => (a.l.length === 0) - (b.l.length === 0)   // yapılmamışlar en sonda
+        || (b.degisim ?? -1e9) - (a.degisim ?? -1e9));
       const tablo = document.querySelector('.bg-tablo');
       tablo.innerHTML = '<thead><tr><th scope="col">Hareket</th><th scope="col">Güç seyri</th>'
-        + '<th scope="col" class="num">En ağır set, ilk → son</th><th scope="col" class="num">Değişim</th>'
+        + '<th scope="col" class="num">Ortalama, ilk → son</th><th scope="col" class="num">Değişim</th>'
         + '<th scope="col" class="num">Set</th></tr></thead><tbody></tbody>';
       const govde = tablo.querySelector('tbody');
       (bgTumu || satirlar.length <= 10 ? satirlar : satirlar.slice(0, 10)).forEach(x => {
         const gun = x.h.ex.closest('.day');
         const tr = document.createElement('tr');
-        tr.className = 'bg-hareket' + (bgHareket === x.anahtar ? ' is-secili' : '');
+        tr.className = 'bg-hareket' + (bgHareket === x.anahtar ? ' is-secili' : '') + (x.l.length ? '' : ' is-bos');
         tr.style.setProperty('--c', `var(--b-${x.bolge})`);
         tr.innerHTML = '<td><span class="bg-nokta"></span><button type="button" class="akt-ad"></button><span class="akt-yer"></span></td><td></td>'
           + '<td class="num"></td><td class="num"><span class="degisim"></span></td><td class="num"></td>';
         const td = tr.querySelectorAll('td');
         td[0].querySelector('.akt-ad').textContent = x.h.ex.querySelector('.ex-name').textContent;
-        td[0].querySelector('.akt-yer').textContent = `${gun.querySelector('.daycard-title').textContent} · ${x.l.length} kayıt`;
-        td[1].append(kucukCizgi(x.g));
-        td[2].textContent = `${nf.format(enAgir(x.l[0]).kg)} → ${nf.format(enAgir(x.l.at(-1)).kg)} kg`;
+        td[0].querySelector('.akt-yer').textContent = `${gun.querySelector('.daycard-title').textContent} · `
+          + (x.l.length ? `${x.l.length} kayıt` : 'henüz yapılmadı');
+        if (x.l.length) td[1].append(kucukCizgi(x.g));
+        td[2].textContent = x.l.length
+          ? `${nf.format(ortalamaKg(x.l[0]))} → ${nf.format(ortalamaKg(x.l.at(-1)))} kg` : '—';
         const dg = td[3].querySelector('.degisim');
         dg.textContent = x.degisim === null ? '—' : yuzde(x.degisim);
         dg.classList.toggle('is-eksi', (x.degisim || 0) <= 0.05);
-        td[4].textContent = x.set;
+        td[4].textContent = x.set || '—';
         tr.addEventListener('click', () => detayAc(x.h.ex));
         govde.append(tr);
       });
