@@ -1269,7 +1269,7 @@
         <h3>Haftalık koşular</h3>
         <p class="k-lejant"><span><i class="lj-kutu" style="--c:var(--kardiyo)"></i>Mesafe · sol eksen (km)</span><span><i class="lj-nokta" style="--c:var(--ink)"></i>Tempo · sağ eksen (/km)</span><span><i class="lj-cizgi" style="--c:var(--ink)"></i>Tempo seyri</span></p>
         <div class="chart" data-grafik="mesafe"><div class="chart-tip" hidden></div></div>
-        <p class="chart-note">Son 12 hafta ya da ay. Her sütun bir koşu; aynı dönemde birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), üstündeki nokta o koşunun temposu (sağdaki eksen, yukarısı daha hızlı). İki ölçünün ekseni ayrı — sütunla nokta arasındaki mesafenin bir anlamı yok. Sütuna ya da noktaya tıklamak ayrıntısını açar.</p>
+        <p class="chart-note">Son 12 hafta ya da ay. Her sütun bir koşu; aynı dönemde birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), üstündeki nokta o koşunun temposu (sağdaki eksen, yukarısı daha hızlı); çizgi bütün noktaları sırayla birleştirir, arada koşulmayan hafta olsa da kesilmez. İki ölçünün ekseni ayrı — sütunla nokta arasındaki mesafenin bir anlamı yok. Sütuna ya da noktaya tıklamak ayrıntısını açar.</p>
       </figure>
     </div>
     <ul class="rekorlar"></ul>
@@ -1300,7 +1300,7 @@
         <h3>Haftalık yüzmeler</h3>
         <p class="k-lejant"><span><i class="lj-kutu" style="--c:var(--kardiyo)"></i>Mesafe · sol eksen (m)</span><span><i class="lj-nokta" style="--c:var(--ink)"></i>Tempo · sağ eksen (/100 m)</span><span><i class="lj-cizgi" style="--c:var(--ink)"></i>Tempo seyri</span></p>
         <div class="chart" data-grafik="mesafe"><div class="chart-tip" hidden></div></div>
-        <p class="chart-note">Son 12 hafta ya da ay. Her sütun bir yüzme; aynı dönemde birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), üstündeki nokta o yüzmenun temposu (sağdaki eksen, yukarısı daha hızlı). İki ölçünün ekseni ayrı — sütunla nokta arasındaki mesafenin bir anlamı yok. Sütuna ya da noktaya tıklamak ayrıntısını açar.</p>
+        <p class="chart-note">Son 12 hafta ya da ay. Her sütun bir yüzme; aynı dönemde birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), üstündeki nokta o yüzmenun temposu (sağdaki eksen, yukarısı daha hızlı); çizgi bütün noktaları sırayla birleştirir, arada koşulmayan hafta olsa da kesilmez. İki ölçünün ekseni ayrı — sütunla nokta arasındaki mesafenin bir anlamı yok. Sütuna ya da noktaya tıklamak ayrıntısını açar.</p>
       </figure>
     </div>
     <ul class="rekorlar"></ul>
@@ -3088,15 +3088,11 @@
       if (enUzun) ciz('text', {x: enUzun.cx, y: enUzun.yM - 6, 'text-anchor': 'middle', class: 'c-val'}, svg)
         .textContent = S.barYaz(enUzun.x.mesafe);
 
-      // Tempo çizgisi yalnızca peş peşe dolu dönemleri birleştirir; boş dönemin üstünden atlamaz.
-      const parcalar = [];
-      kayitlar.forEach(o => {
-        o.yT = Yt(o.tempo);
-        const son = parcalar.at(-1);
-        if (son && o.i - son.at(-1).i <= 1) son.push(o); else parcalar.push([o]);
-      });
-      parcalar.filter(p => p.length > 1).forEach(p => ciz('path',
-        {d: p.map((o, j) => `${j ? 'L' : 'M'}${o.cx.toFixed(1)},${o.yT.toFixed(1)}`).join(''), class: 'c-line2'}, svg));
+      // Tempo çizgisi bütün koşuları sırayla birleştirir; aradaki boş haftalarda kesilmez
+      // (kullanıcı tercihi: seyri bütün görmek, "o hafta koşmadım" bilgisi zaten sütunun yokluğunda).
+      kayitlar.forEach(o => { o.yT = Yt(o.tempo); });
+      if (kayitlar.length > 1) ciz('path',
+        {d: kayitlar.map((o, j) => `${j ? 'L' : 'M'}${o.cx.toFixed(1)},${o.yT.toFixed(1)}`).join(''), class: 'c-line2'}, svg);
       kayitlar.forEach(o => ciz('circle',
         {cx: o.cx, cy: o.yT, r: 4.5, fill: 'var(--ink)', stroke: 'var(--surface)', 'stroke-width': 2}, svg));
       const sonKayit = kayitlar.at(-1);
