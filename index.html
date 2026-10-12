@@ -3208,15 +3208,20 @@
         o.yM = Ym(o.mesafe / S.olcek);
         ciz('path', {d: ustuYuvarlak(o.cx - o.bw / 2, o.yM, o.bw, taban - o.yM), class: 'c-bar'}, svg);
       });
-      // Mesafe etiketleri: sütunların üstüne, sığdığı kadar. Yan yana iki sütun 30px'den yakınsa
-      // etiket atlanır (haftalıkta aynı haftanın koşuları birbirine çok yakın olabiliyor).
-      let sonEtiketX = -Infinity;
-      kayitlar.forEach(o => {
-        if (o.cx - sonEtiketX < 32) return;
-        sonEtiketX = o.cx;
+      // Mesafe etiketi her sütuna yazılır. Sütunlar sıkışıksa ondalık atılır ("14,1" yerine "14");
+      // o da sığmıyorsa etiket atlanır. Genişlik 11px yazıda karakter başına ~6,2px sayılır.
+      const kisaYaz = m => nf.format(Math.round(m / S.olcek));
+      let oncekiSag = -Infinity;
+      kayitlar.forEach((o, idx) => {
+        const solBosluk = o.cx - (kayitlar[idx - 1]?.cx ?? -1e9);
+        const sagBosluk = (kayitlar[idx + 1]?.cx ?? 1e9) - o.cx;
+        const genis = Math.min(solBosluk, sagBosluk) >= 34;
+        const metin = genis ? S.barYaz(o.mesafe) : kisaYaz(o.mesafe);
+        const yari = metin.length * 3.1 + 1;
+        if (o.cx - yari < oncekiSag + 3) return;
+        oncekiSag = o.cx + yari;
         o.etiketli = true;
-        ciz('text', {x: o.cx, y: o.yM - 6, 'text-anchor': 'middle', class: 'c-val'}, svg)
-          .textContent = S.barYaz(o.mesafe);
+        ciz('text', {x: o.cx, y: o.yM - 6, 'text-anchor': 'middle', class: 'c-val'}, svg).textContent = metin;
       });
 
       // Tempo çizgisi bütün koşuları sırayla birleştirir; aradaki boş haftalarda kesilmez
