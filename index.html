@@ -1921,8 +1921,8 @@
         + '<td><input inputmode="numeric" autocomplete="off"></td>'
         + '<td><button type="button" class="set-del"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></td>';
       const [kgI, tkI, rirI] = tr.querySelectorAll('input');
-      kgI.value = set.kg != null ? kgYaz(set.kg) : kgOneri;
-      if (kgOneri) kgI.dataset.oneri = kgOneri;
+      kgI.value = set.kg != null ? kgYaz(set.kg) : '';
+      if (kgOneri) kgI.placeholder = kgOneri;   // geçen seferki ağırlık: yalnız ipucu, alan boş kalır
       tkI.value = set.tekrar ?? '';
       rirI.value = set.rir ?? '';
       tkI.placeholder = aktif.plan.tekrar;
@@ -1933,9 +1933,12 @@
 
     // Seçilen tarihte kayıt varsa onu düzenlemeye açar; yoksa plandaki set sayısıyla boş form,
     // ağırlıklar son antrenmandan önerilir.
-    const formuDoldur = tarih => {
+    // Form varsayılan olarak BOŞ açılır; o tarihte kayıt olsa bile. Var olanı düzenlemek için
+    // geçmiş listesindeki "Düzenle" düğmesi kullanılır (duzenle = true).
+    const formuDoldur = (tarih, duzenle = false) => {
       const liste = seanslar(aktif.anahtar);
-      const mevcut = liste.find(s => s.tarih === tarih);
+      const varOlan = liste.find(s => s.tarih === tarih);
+      const mevcut = duzenle ? varOlan : null;
       tarihGir.value = tarih;
       duzenlenen = mevcut ? tarih : null;
       setGovde.replaceChildren();
@@ -1950,7 +1953,7 @@
       }
       setNumarala();
       $('#form-baslik').textContent = mevcut ? `Kaydı düzenle · ${gunAy.format(tarihOku(tarih))}` : 'Yeni kayıt';
-      mesajYaz('');
+      mesajYaz(!mevcut && varOlan ? `${gunAy.format(tarihOku(tarih))} için kayıt var; kaydedersen üzerine yazılır.` : '');
     };
 
     $('[data-set-ekle]').addEventListener('click', () => {
@@ -1973,7 +1976,7 @@
       for (const [i, tr] of [...setGovde.rows].entries()) {
         const [kgI, tkI, rirI] = [...tr.querySelectorAll('input')].map(x => x.value.trim());
         const kgInput = tr.querySelector('input');
-        if (!tkI && !rirI && (!kgI || kgI === kgInput.dataset.oneri)) continue;
+        if (!kgI && !tkI && !rirI) continue;   // hiç dokunulmamış satır
         const kg = Number(kgI.replace(',', '.')), tekrar = Number(tkI), rir = rirI === '' ? null : Number(rirI);
         if (!kgI || !Number.isFinite(kg) || kg < 0) return mesajYaz(`Set ${i + 1}: ağırlığı gir.`, true);
         if (!Number.isInteger(tekrar) || tekrar < 1) return mesajYaz(`Set ${i + 1}: tekrar sayısını gir.`, true);
@@ -2200,7 +2203,7 @@
         duzenle.setAttribute('aria-label', `${tamTarih.format(d)} kaydını düzenle`);
         sil.setAttribute('aria-label', `${tamTarih.format(d)} kaydını sil`);
         duzenle.addEventListener('click', () => {
-          formuDoldur(seans.tarih);
+          formuDoldur(seans.tarih, true);
           form.scrollIntoView({behavior: azHareket.matches ? 'auto' : 'smooth', block: 'center'});
           form.querySelector('tbody input')?.focus({preventScroll: true});
         });
