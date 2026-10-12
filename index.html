@@ -29,6 +29,7 @@
     --b-gogus:#2F4BC7; --b-omuz:#C05621; --b-sirt:#00A39A; --b-biceps:#A62C93;
     --b-triceps:#B08A00; --b-karin:#8257D9; --b-bacak:#4F6B24; --b-diger:#6B7280;
     --besin:#2E7D32;
+    --onay:#2E7D32;
     --measure:68ch;
   }
 
@@ -297,6 +298,8 @@
   .ex-log svg{width:14px;height:14px;flex:none;color:var(--day);}
   .ex-log:hover{border-color:var(--day);}
   .ex-log.is-empty{font-weight:500;color:var(--ink-soft);border-style:dashed;}
+  .ex-log.is-yapildi{color:var(--onay);border-color:var(--onay);background:color-mix(in srgb,var(--onay) 8%,#fff);}
+  .ex-log.is-yapildi svg{color:var(--onay);}
 
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 
@@ -1837,16 +1840,25 @@
 
     // Satırdaki düğme: son antrenmanın en ağır seti; kayıt yoksa "Kayıt ekle".
     const IKON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 12 5.5 7.5l3 2.5 6-6.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const TIK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.5 6.2 12 13.5 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    // Rozet iki şey söyler: o güne kayıt girildi mi (yeşil tik) ve son antrenmanın ortalama ağırlığı.
+    // Ağırlık en ağır set değil, seansın ortalaması — grafikle aynı dil.
     const rozetGuncelle = ex => {
       const rozet = ex.querySelector('.ex-log');
       const ad = ex.querySelector('.ex-name').textContent;
-      const son = seanslar(exAnahtar(ex)).at(-1);
-      const set = son && enAgir(son);
-      rozet.innerHTML = IKON + `<span>${set ? nf.format(set.kg) + ' kg' : 'Kayıt ekle'}</span>`;
-      rozet.classList.toggle('is-empty', !set);
-      rozet.setAttribute('aria-label', set
-        ? `${ad} ilerlemesi. Son antrenman ${gunAy.format(tarihOku(son.tarih))}: ${nf.format(set.kg)} kilo, ${set.tekrar} tekrar`
-        : `${ad} için kayıt ekle`);
+      const liste = seanslar(exAnahtar(ex));
+      const gunTarihi = ex.closest('.day')?.dataset.tarih;
+      const bugunku = gunTarihi && liste.find(x => x.tarih === gunTarihi);
+      const son = bugunku || liste.at(-1);
+      const kg = son && ortalamaKg(son);
+      rozet.innerHTML = (bugunku ? TIK : IKON) + `<span>${son ? nf.format(kg) + ' kg' : 'Kayıt ekle'}</span>`;
+      rozet.classList.toggle('is-empty', !son);
+      rozet.classList.toggle('is-yapildi', !!bugunku);
+      rozet.setAttribute('aria-label', bugunku
+        ? `${ad} bugün yapıldı: ortalama ${nf.format(kg)} kilo. İlerlemeyi aç`
+        : son
+          ? `${ad} ilerlemesi. Son antrenman ${gunAy.format(tarihOku(son.tarih))}: ortalama ${nf.format(kg)} kilo`
+          : `${ad} için kayıt ekle`);
     };
 
     const detay = document.getElementById('detay');
@@ -4209,7 +4221,7 @@
     });
 
     // ---------- Açılış ----------
-    function sayfaYenile() { seritCiz(); gunlerCiz(); gelisimCiz(); sporCiz('kosu'); sporCiz('yuzme'); beslenmeCiz(); }
+    function sayfaYenile() { seritCiz(); gunlerCiz(); document.querySelectorAll('.ex').forEach(rozetGuncelle); gelisimCiz(); sporCiz('kosu'); sporCiz('yuzme'); beslenmeCiz(); }
     select(cells[today]);
     const acilis = (location.hash || '').slice(1);
     anaSec(anaSekmeler.find(s => s.dataset.adres === (ESKI_ADRES[acilis] || acilis)) || anaSekmeler[0], {adres: false});
