@@ -2892,16 +2892,34 @@
         }
       });
 
-      // Az seri varsa son noktaya doğrudan etiket (kg), çok seri varsa etiket yerine ipucu kalır.
-      if (az) {
+      // Değerler doğrudan grafiğe yazılır: az nokta varsa HER noktaya, kalabalıksa yalnız son noktaya.
+      // Aynı dönemde üst üste binmesinler diye noktalar dikeyde sıralanıp en az 13px aralıkla yerleşir.
+      const toplamNokta = seriler.reduce((t, x) => t + x.dolu.length, 0);
+      const hepsi = az && toplamNokta <= 28;
+      const etiketYaz = (x, y, metin, renk, sol) => {
+        const t = ciz('text', {x: sol ? x - 7 : x + 7, y: y + 4, class: 'c-val',
+          'text-anchor': sol ? 'end' : 'start'}, svg);
+        t.setAttribute('fill', renk);
+        t.textContent = metin;
+      };
+      if (hepsi) {
+        ks.forEach((k, i) => {
+          const ayni = seriler.map(seri => ({seri, p: seri.dolu.find(o => o.i === i)}))
+            .filter(o => o.p).sort((a, b) => Y(a.p.v) - Y(b.p.v));
+          let oncekiY = -99;
+          ayni.forEach(({seri, p}) => {
+            const y = Math.max(Y(p.v) - 9, oncekiY + 13);
+            oncekiY = y;
+            etiketYaz(X(p.i), y, `${nf.format(p.v)}`, seri.renk, i === ks.length - 1);
+          });
+        });
+      } else if (az) {
         const etiketler = seriler.map(s => ({s, p: s.dolu.at(-1)})).filter(o => o.p).sort((a, b) => Y(a.p.v) - Y(b.p.v));
         let oncekiY = -99;
         etiketler.forEach(({s, p}) => {
           const y = Math.max(Y(p.v), oncekiY + 13);
           oncekiY = y;
-          const t = ciz('text', {x: X(p.i) + 9, y: y + 4, class: 'c-val'}, svg);
-          t.setAttribute('fill', s.renk);
-          t.textContent = `${nf.format(p.v)} kg`;
+          etiketYaz(X(p.i), y, `${nf.format(p.v)} kg`, s.renk, true);
         });
       }
       kovaEtiketleri(svg, H, P, ks, bant);
