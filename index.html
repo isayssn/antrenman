@@ -676,8 +676,24 @@
   .seg button + button{border-left:1.5px solid var(--rule);}
   .seg button:hover{background:var(--paper);}
   .seg button[aria-pressed="true"]{background:var(--ink);color:#fff;}
-  .bos-dugme{font-size:.82rem;padding:5px 11px;}
-  .bos-dugme[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;border-style:solid;}
+  /* Boş dönemleri gizle: telefonlardaki kaydırmalı anahtar gibi, filtre satırının sağ ucunda */
+  .anahtar{
+    display:inline-flex;align-items:center;gap:9px;margin-left:auto;padding:2px;
+    font:inherit;font-size:.82rem;color:var(--ink-soft);background:none;border:0;cursor:pointer;
+  }
+  .anahtar-yuva{
+    position:relative;flex:none;width:40px;height:23px;border-radius:12px;
+    background:var(--rule);transition:background .16s ease;
+  }
+  .anahtar-top{
+    position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(27,36,48,.3);transition:transform .16s ease;
+  }
+  .anahtar:hover .anahtar-yuva{background:color-mix(in srgb,var(--ink) 25%,var(--rule));}
+  .anahtar[aria-checked="true"]{color:var(--ink);font-weight:500;}
+  .anahtar[aria-checked="true"] .anahtar-yuva{background:var(--onay);}
+  .anahtar[aria-checked="true"] .anahtar-top{transform:translateX(17px);}
+  @media (prefers-reduced-motion:reduce){.anahtar-yuva,.anahtar-top{transition:none;}}
   .k-not{font-size:.8rem;color:var(--ink-soft);align-self:center;}
   .esitle-durum{font-size:.82rem;color:var(--ink-soft);align-self:center;}
   .esitle-durum.is-error{color:var(--caution);}
@@ -1216,7 +1232,10 @@
       <button type="button" data-d="hafta" aria-pressed="true">Haftalık</button>
       <button type="button" data-d="ay" aria-pressed="false">Aylık</button>
     </div>
-    <button type="button" class="btn-ghost bos-dugme" data-bos aria-pressed="false">Boş dönemleri gizle</button>
+    <button type="button" class="anahtar" data-bos role="switch" aria-checked="false">
+      <span class="anahtar-yuva" aria-hidden="true"><span class="anahtar-top"></span></span>
+      <span>Boş dönemleri gizle</span>
+    </button>
     <span class="filtre-ad">Spor</span>
     <div class="seg" data-spor-filtre role="group" aria-label="Spor">
       <button type="button" data-s="hepsi" aria-pressed="true">Tümü</button>
@@ -1266,7 +1285,10 @@
         <button type="button" data-d="hafta" aria-pressed="true">Haftalık</button>
         <button type="button" data-d="ay" aria-pressed="false">Aylık</button>
       </div>
-      <button type="button" class="btn-ghost bos-dugme" data-bos aria-pressed="false">Boş dönemleri gizle</button>
+      <button type="button" class="anahtar" data-bos role="switch" aria-checked="false">
+        <span class="anahtar-yuva" aria-hidden="true"><span class="anahtar-top"></span></span>
+        <span>Boş dönemleri gizle</span>
+      </button>
     </div>
     <div class="grafikler">
       <figure class="k-fig">
@@ -1298,7 +1320,10 @@
         <button type="button" data-d="hafta" aria-pressed="true">Haftalık</button>
         <button type="button" data-d="ay" aria-pressed="false">Aylık</button>
       </div>
-      <button type="button" class="btn-ghost bos-dugme" data-bos aria-pressed="false">Boş dönemleri gizle</button>
+      <button type="button" class="anahtar" data-bos role="switch" aria-checked="false">
+        <span class="anahtar-yuva" aria-hidden="true"><span class="anahtar-top"></span></span>
+        <span>Boş dönemleri gizle</span>
+      </button>
     </div>
     <div class="grafikler">
       <figure class="k-fig">
@@ -3067,7 +3092,15 @@
       const liste0 = sporListe(tur);
       const ks = kovaSuz(kovalar(), k => liste0.some(x => kovadaMi(x.tarih, k)));
       const n = ks.length;
-      kok.querySelector('.k-fig h3').textContent = `${donem === 'hafta' ? 'Haftalık' : 'Aylık'} ${tur === 'kosu' ? 'koşular' : 'yüzmeler'}`;
+      const cog = tur === 'kosu' ? 'koşular' : 'yüzmeler', tek_ = tur === 'kosu' ? 'koşu' : 'yüzme';
+      kok.querySelector('.k-fig h3').textContent = `${donem === 'hafta' ? 'Haftalık' : 'Aylık'} ${cog}`;
+      kok.querySelector('.k-fig .chart-note').textContent = donem === 'hafta'
+        ? `Her sütun bir ${tek_}; aynı haftada birden fazla varsa yan yana durur. Sütunun yüksekliği mesafe (soldaki eksen), `
+          + `üstündeki nokta o ${tek_}nun temposu (sağdaki eksen, yukarısı daha hızlı); çizgi bütün noktaları sırayla birleştirir, `
+          + `arada ${tek_} yapılmayan hafta olsa da kesilmez. Sütuna ya da noktaya tıklamak ayrıntısını açar.`
+        : `Her sütun bir ayın toplam mesafesi (soldaki eksen); üstündeki nokta o ayın mesafeye göre ağırlıklı ortalama temposu `
+          + `— toplam süre ÷ toplam mesafe, uzun ${cog} ortalamayı daha çok çeker (sağdaki eksen, yukarısı daha hızlı). `
+          + `Sütunun üstünde beklersen ayın toplamı, ${tek_} sayısı ve en uzunu yazar.`;
       const kutu = kok.querySelector('[data-grafik="mesafe"]'), tip = kutu.querySelector('.chart-tip');
       const P = {l: 44, r: 52, t: 26, b: 28};
       const H = 280;
@@ -3075,21 +3108,31 @@
       const bant = (W - P.l - P.r) / n;
       const liste = sporListe(tur);
 
+      // Haftalıkta her koşu kendi sütunu; aylıkta ayın toplamı tek sütun ve tempo ayın
+      // mesafeye göre ağırlıklı ortalaması (toplam süre / toplam mesafe).
+      const aylik = donem === 'ay';
       const kayitlar = [];
       ks.forEach((k, i) => {
         const l = liste.filter(x => kovadaMi(x.tarih, k));
         if (!l.length) return;
+        if (aylik) {
+          const mesafe = l.reduce((t, x) => t + x.mesafe, 0);
+          const sure = l.reduce((t, x) => t + x.sure, 0);
+          const bw = Math.min(26, bant * .5);
+          kayitlar.push({l, i, kova: k, bw, mesafe, sure, cx: P.l + bant * (i + .5), tempo: sure / (mesafe / S.tempoBirim)});
+          return;
+        }
         const bw = Math.min(18, (bant * .78 - (l.length - 1) * 3) / l.length);
         const grup = l.length * bw + (l.length - 1) * 3;
         l.forEach((x, j) => kayitlar.push({
-          x, i, kova: k, bw,
+          l: [x], i, kova: k, bw, mesafe: x.mesafe, sure: x.sure,
           cx: P.l + bant * (i + .5) - grup / 2 + j * (bw + 3) + bw / 2,
           tempo: tempoSn(x),
         }));
       });
 
       const taban = H - P.b;
-      const czM = guzelAralik(0, Math.max(S.enAzUst, ...kayitlar.map(o => o.x.mesafe / S.olcek)));
+      const czM = guzelAralik(0, Math.max(S.enAzUst, ...kayitlar.map(o => o.mesafe / S.olcek)));
       const ustM = czM.at(-1);
       const Ym = v => P.t + (1 - v / ustM) * (taban - P.t);
       yatayCizgiler(svg, W, P, czM, Ym);
@@ -3108,12 +3151,12 @@
       ciz('text', {x: W - P.r + 8, y: P.t - 10, class: 'c-lbl'}, svg).textContent = 'tempo';
 
       kayitlar.forEach(o => {
-        o.yM = Ym(o.x.mesafe / S.olcek);
+        o.yM = Ym(o.mesafe / S.olcek);
         ciz('path', {d: ustuYuvarlak(o.cx - o.bw / 2, o.yM, o.bw, taban - o.yM), class: 'c-bar'}, svg);
       });
-      const enUzun = kayitlar.reduce((a, o) => !a || o.x.mesafe > a.x.mesafe ? o : a, null);
+      const enUzun = kayitlar.reduce((a, o) => !a || o.mesafe > a.mesafe ? o : a, null);
       if (enUzun) ciz('text', {x: enUzun.cx, y: enUzun.yM - 6, 'text-anchor': 'middle', class: 'c-val'}, svg)
-        .textContent = S.barYaz(enUzun.x.mesafe);
+        .textContent = S.barYaz(enUzun.mesafe);
 
       // Tempo çizgisi bütün koşuları sırayla birleştirir; aradaki boş haftalarda kesilmez
       // (kullanıcı tercihi: seyri bütün görmek, "o hafta koşmadım" bilgisi zaten sütunun yokluğunda).
@@ -3128,21 +3171,22 @@
       kovaEtiketleri(svg, H, P, ks, bant);
 
       kayitlar.forEach(o => {
-        const k = o.x;
-        const satirlar = [
-          `${mesafeYaz(k)} · ${tempoYaz(k)}`,
-          `Süre ${sureYaz(k.sure)}`,
-          k.nabiz ? `Ortalama nabız ${Math.round(k.nabiz)}` : '',
-          'Ayrıntı için tıkla',
-        ].filter(Boolean);
+        const tekli = o.l.length === 1 ? o.l[0] : null;
+        const baslik = tekli ? (tekli.ad || turAdi[tekli.tur]) : D().tamEtiket(o.kova);
+        const alt = tekli ? tamTarih.format(tarihOku(tekli.tarih)) : `${o.l.length} ${S.ad}`;
+        const satirlar = tekli
+          ? [`${mesafeYaz(tekli)} · ${tempoYaz(tekli)}`, `Süre ${sureYaz(tekli.sure)}`,
+            tekli.nabiz ? `Ortalama nabız ${Math.round(tekli.nabiz)}` : '', 'Ayrıntı için tıkla'].filter(Boolean)
+          : [`Toplam ${toplamYaz(tur, o.mesafe)}`, `Ortalama tempo ${sureYaz(o.tempo)} ${S.tempoEk}`,
+            `Toplam süre ${sureYaz(o.sure)}`, `En uzunu ${mesafeYaz(o.l.reduce((a, x) => x.mesafe > a.mesafe ? x : a))}`];
         const gen = Math.max(o.bw, 16) + 4;
         const hit = ciz('rect', {x: o.cx - gen / 2, y: P.t - 10, width: gen, height: taban - P.t + 10, class: 'c-hit'}, svg);
         hit.addEventListener('pointerenter', () => {
-          tipDoldur(tip, k.ad || turAdi[k.tur], tamTarih.format(tarihOku(k.tarih)), satirlar);
+          tipDoldur(tip, baslik, alt, satirlar);
           tipKonum(kutu, tip, o.cx, Math.min(o.yM, o.yT));
         });
         mouseCikinca(hit, () => { tip.hidden = true; });
-        hit.addEventListener('click', () => { tip.hidden = true; kardiyoAc(k); });
+        if (tekli) hit.addEventListener('click', () => { tip.hidden = true; kardiyoAc(tekli); });
       });
     };
 
@@ -3202,7 +3246,7 @@
     // Boş dönem seçeneği de ortak: her grafik kendi "dolu" ölçütüyle süzer.
     document.querySelectorAll('[data-bos]').forEach(b => b.addEventListener('click', () => {
       bosGizle = !bosGizle;
-      document.querySelectorAll('[data-bos]').forEach(x => x.setAttribute('aria-pressed', String(bosGizle)));
+      document.querySelectorAll('[data-bos]').forEach(x => x.setAttribute('aria-checked', String(bosGizle)));
       sporCiz('kosu');
       sporCiz('yuzme');
       gelisimCiz();
