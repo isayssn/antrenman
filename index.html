@@ -2914,10 +2914,16 @@
             const komsuY = komsular.length ? komsular.reduce((t, v) => t + v, 0) / komsular.length : Infinity;
             return {seri, p: seri.dolu[j], yukari: komsuY >= Y(seri.dolu[j].v)};
           }).filter(Boolean);
-          ayni.filter(o => o.yukari).sort((a, b) => Y(a.p.v) - Y(b.p.v))
-            .forEach((o, n) => etiketYaz(x, Y(o.p.v) - 11 - n * 13, nf.format(o.p.v), o.seri.renk, hiza));
-          ayni.filter(o => !o.yukari).sort((a, b) => Y(b.p.v) - Y(a.p.v))
-            .forEach((o, n) => etiketYaz(x, Y(o.p.v) + 18 + n * 13, nf.format(o.p.v), o.seri.renk, hiza));
+          // Etiket noktasına yakın durur (üstte 10px, altta 15px); yalnız gerçekten üst üste
+          // bineceklerse birbirinden itilir, yoksa boşuna uzaklaşmasınlar.
+          const yerler = ayni.map(o => ({...o, y: o.yukari ? Y(o.p.v) - 10 : Y(o.p.v) + 15}))
+            .sort((a, b) => a.y - b.y);
+          let onceki = -Infinity;
+          yerler.forEach(o => {
+            o.y = Math.max(o.y, onceki + 13);
+            onceki = o.y;
+            etiketYaz(x, o.y, nf.format(o.p.v), o.seri.renk, hiza);
+          });
         });
       } else if (az) {
         const etiketler = seriler.map(s => ({s, p: s.dolu.at(-1)})).filter(o => o.p).sort((a, b) => Y(a.p.v) - Y(b.p.v));
