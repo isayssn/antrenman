@@ -449,7 +449,8 @@
   .h-sets li.is-top{border-color:var(--day);font-weight:600;}
   .h-sets small{margin-left:5px;font-size:.74rem;font-weight:400;color:var(--ink-soft);}
   .h-actions{display:flex;gap:2px;align-items:center;}
-  .h-kaynak{font-size:.74rem;color:var(--ink-soft);white-space:nowrap;}
+  .h-kaynak{max-width:170px;font-size:.74rem;line-height:1.3;color:var(--ink-soft);text-align:right;}
+  .h-kaynak small{display:block;font-size:1em;}
   .h-actions button{
     padding:3px 6px;font:inherit;font-size:.76rem;color:var(--ink-soft);
     background:none;border:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;
@@ -2119,8 +2120,42 @@
       return (gun.closest('#bolum-hoca') ? 'Hoca' : 'Fitness') + ' · '
         + (gun.querySelector('.daycard-title')?.textContent || '');
     };
+
+    // Eşleştirme ad yazımına değil HAREKETE bakar: iki program aynı hareketi başka adla yazıyor
+    // ("Chest Press Machine" / "Machine Chest Press") ya da yakın bir varyantını kullanıyor
+    // (rope / V bar pushdown, yatarak / oturarak leg curl). Her satır bir hareket ailesi; içindeki
+    // adlar aynı sayılır. Listede olmayan ad yalnız kendi adıyla eşleşir.
+    // Kasıtlı olarak DIŞARIDA tutulanlar: eğim farkı (incline / decline press), aygıt farkı
+    // (dumbbell row ↔ makine row, cable crunch ↔ crunch, cable ↔ dumbbell lateral raise) —
+    // ağırlık ölçeği tutmuyor, birleşik grafik yanıltırdı.
+    const AILELER = [
+      ['gogus-press-makine', ['Chest Press Machine', 'Machine Chest Press']],
+      ['pec-deck', ['Pecdeck Fly', 'Pec Deck Fly']],
+      ['triceps-pushdown', ['Rope Pushdown', 'Rope Push Down', 'V Bar Push Down']],
+      ['hammer-curl', ['Hammer Curl', 'Barbell Hammer Curl', 'Dumbbell Hammer Curl']],
+      ['donusumlu-curl', ['Alternating Dumbbell Curl', 'Dumbbell Alternating Curl']],
+      ['lat-pulldown', ['Lat Pulldown Wide Grip', 'Lat Pull Down', 'Close Grip Lat Pull Down']],
+      ['leg-curl', ['Seated Leg Curl', 'Lying Leg Curl']],
+      ['calf-raise', ['Smith Machine Calf Raise', 'Standing Calf Raise']],
+      ['omuz-press-makine', ['Machine Overhead Press', 'Smith Machine Shoulder Press']],
+    ];
+    const AILE = {};
+    AILELER.forEach(([aile, adlar]) => adlar.forEach(ad => { AILE[slug(ad)] = aile; }));
+    const hareketKimligi = a => AILE[anahtarAdi(a)] || anahtarAdi(a);
+
+    // Ad sözlüğü: kayıt başka adla duruyorsa ("Rope Pushdown") etikette o ad yazsın.
+    const hareketAdi = {};
+    document.querySelectorAll('.ex').forEach(ex => {
+      hareketAdi[slug(ex.querySelector('.ex-name').textContent)] = ex.querySelector('.ex-name').textContent;
+    });
+    // Kaynak etiketi: hangi programın hangi günü, hareket adı farklıysa o ad da.
+    const kaynakEtiketi = (kaynak, anahtar) => {
+      const ad = hareketAdi[anahtarAdi(kaynak)];
+      return anahtarGunu(kaynak) + (ad && anahtarAdi(kaynak) !== anahtarAdi(anahtar) ? ' · ' + ad : '');
+    };
+
     const esSeanslar = anahtar => Object.keys(depo.kayitlar)
-      .filter(a => a !== anahtar && anahtarAdi(a) === anahtarAdi(anahtar))
+      .filter(a => a !== anahtar && hareketKimligi(a) === hareketKimligi(anahtar))
       .flatMap(a => seanslar(a).map(x => ({...x, kaynak: a})));
     const birlesikSeanslar = anahtar => [...seanslar(anahtar), ...esSeanslar(anahtar)]
       .sort((a, b) => a.tarih.localeCompare(b.tarih));
@@ -2191,11 +2226,11 @@
       const son = bugunku || liste.at(-1);
       const kg = son && ortalamaKg(son);
       // Gösterilen kayıt başka bir günden geliyorsa nereden geldiği rozetin ucunda yazar.
-      const nereden = son?.kaynak ? ` (${anahtarGunu(son.kaynak)})` : '';
+      const nereden = son?.kaynak ? ` (${kaynakEtiketi(son.kaynak, exAnahtar(ex))})` : '';
       rozet.innerHTML = (bugunku ? TIK : IKON) + `<span>${son ? nf.format(kg) + ' kg' : 'Kayıt ekle'}</span>`;
       rozet.classList.toggle('is-empty', !son);
       rozet.classList.toggle('is-yapildi', !!bugunku);
-      rozet.title = son?.kaynak ? `${anahtarGunu(son.kaynak)} kaydı` : '';
+      rozet.title = son?.kaynak ? `${kaynakEtiketi(son.kaynak, exAnahtar(ex))} kaydı` : '';
       rozet.setAttribute('aria-label', bugunku
         ? `${ad} bugün yapıldı: ortalama ${nf.format(kg)} kilo${nereden}. İlerlemeyi aç`
         : son
@@ -2355,7 +2390,7 @@
       const kutular = [
         ['Son antrenman', son ? nf.format(ortalamaKg(son)) + ' kg' : '—', son
           ? `ortalama · en ağır ${nf.format(sonSet.kg)} kg × ${sonSet.tekrar} · ${gunAy.format(tarihOku(son.tarih))}`
-            + (son.kaynak ? ` · ${anahtarGunu(son.kaynak)}` : '')
+            + (son.kaynak ? ` · ${kaynakEtiketi(son.kaynak, aktif.anahtar)}` : '')
           : 'henüz kayıt yok'],
         ['En iyi set', enIyi ? nf.format(enAgir(enIyi).kg) + ' kg' : '—', enIyi ? gunAy.format(tarihOku(enIyi.tarih)) : ''],
         ['Değişim', ...degisim],
@@ -2477,7 +2512,7 @@
         baslik.textContent = nf.format(p.v) + ' kg';
         const tarih = document.createElement('span');
         tarih.textContent = tamTarih.format(new Date(p.t))
-          + (p.s.kaynak ? ' · ' + anahtarGunu(p.s.kaynak) : '');
+          + (p.s.kaynak ? ' · ' + kaynakEtiketi(p.s.kaynak, aktif.anahtar) : '');
         const setListesi = document.createElement('ul');
         p.s.setler.forEach(s => {
           const li = document.createElement('li');
@@ -2555,6 +2590,12 @@
           const kaynak = document.createElement('span');
           kaynak.className = 'h-kaynak';
           kaynak.textContent = anahtarGunu(seans.kaynak);
+          const baskaAd = hareketAdi[anahtarAdi(seans.kaynak)];
+          if (baskaAd && anahtarAdi(seans.kaynak) !== anahtarAdi(aktif.anahtar)) {
+            const k = document.createElement('small');
+            k.textContent = baskaAd;
+            kaynak.append(k);
+          }
           li.querySelector('.h-actions').replaceChildren(kaynak);
           return li;
         }
