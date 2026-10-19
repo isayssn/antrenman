@@ -553,6 +553,46 @@
   .c-hit:hover{fill:rgba(27,36,48,.04);}
 
   /* per-exercise progress */
+  /* ---------- Hocanın programı (yalnız okunur) ---------- */
+  .hoca-ust{margin:0 0 16px;max-width:var(--measure);font-size:.92rem;color:var(--ink-soft);}
+  .hoca-gunler{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 18px;}
+  .hoca-gun{
+    padding:8px 13px 9px;font:inherit;font-size:.9rem;font-weight:500;cursor:pointer;text-align:left;
+    background:var(--surface);border:1.5px solid var(--rule);border-radius:2px;color:var(--ink);
+  }
+  .hoca-gun small{display:block;font-size:.72rem;font-weight:400;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;}
+  .hoca-gun:hover{border-color:var(--ink);}
+  .hoca-gun[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .hoca-gun[aria-selected="true"] small{color:rgba(255,255,255,.72);}
+  .hoca-kart{padding:18px 18px 20px;background:var(--panel);border:1.5px solid var(--rule);border-radius:2px;}
+  .hoca-bas{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin:0 0 4px;}
+  .hoca-bas h3{margin:0;font-family:Oswald,sans-serif;font-size:1.5rem;font-weight:500;}
+  .hoca-bas span{font-size:.85rem;color:var(--ink-soft);}
+  .hoca-liste{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:2px;}
+  .h-oge{
+    display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:baseline;gap:4px 12px;
+    padding:10px 0;border-bottom:1px solid var(--rule);
+  }
+  .h-oge:last-child{border-bottom:0;}
+  .h-no{font-family:Oswald,sans-serif;font-size:.95rem;color:var(--ink-soft);}
+  .h-ad{font-size:.98rem;font-weight:600;}
+  .h-doz{font-size:.88rem;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .h-not{grid-column:2/4;margin:2px 0 0;font-size:.82rem;color:var(--ink-soft);}
+  .h-oge.is-kardiyo .h-ad{color:var(--kardiyo);}
+  .h-super{
+    margin:8px 0;padding:12px 14px;background:var(--surface);
+    border:1.5px dashed var(--rule);border-radius:2px;
+  }
+  .h-super-bas{margin:0;font-size:.8rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-soft);}
+  .h-super-not{margin:4px 0 0;font-size:.82rem;color:var(--ink-soft);}
+  .h-super .h-oge{padding:8px 0;}
+  .h-super .h-oge:last-child{border-bottom:0;}
+  @media (max-width:620px){
+    .h-oge{grid-template-columns:24px minmax(0,1fr);}
+    .h-doz{grid-column:2;}
+    .h-not{grid-column:2;}
+  }
+
   /* ---------- Beslenme ---------- */
   .b-serit{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:0 0 18px;}
   .b-gun{
@@ -863,6 +903,7 @@
   <!-- Ana sekmeler: adres çubuğundaki #program / #gelisim / #kosu hangisinin açılacağını belirler. -->
   <div class="ana-sekme" role="tablist" aria-label="Bölümler">
     <button type="button" role="tab" id="st-fitness" aria-controls="bolum-fitness" aria-selected="true" data-adres="fitness">Fitness</button>
+    <button type="button" role="tab" id="st-hoca" aria-controls="bolum-hoca" aria-selected="false" data-adres="hoca">Hoca</button>
     <button type="button" role="tab" id="st-kosu" aria-controls="bolum-kosu" aria-selected="false" data-adres="kosu">Koşu</button>
     <button type="button" role="tab" id="st-yuzme" aria-controls="bolum-yuzme" aria-selected="false" data-adres="yuzme">Yüzme</button>
     <button type="button" role="tab" id="st-beslenme" aria-controls="bolum-beslenme" aria-selected="false" data-adres="beslenme">Beslenme</button>
@@ -1276,6 +1317,13 @@
 </div>
 
 <!-- KOŞU: genel görünüm; bir koşuya tıklamak detay penceresini açar. -->
+<!-- HOCA: Korhan Hoca'nın verdiği program, uygulamadaki haliyle. Yalnız okunur, kayıt tutulmaz. -->
+<div class="bolum" id="bolum-hoca" role="tabpanel" aria-labelledby="st-hoca" hidden>
+  <p class="hoca-ust">Korhan Hoca'nın verdiği program, uygulamadaki haliyle duruyor — set, tekrar, dinlenme ve süperset düzeni değiştirilmedi. Burada kayıt tutulmaz; kendi programın Fitness sekmesinde.</p>
+  <div class="hoca-gunler" role="tablist" aria-label="Hocanın günleri"></div>
+  <div class="hoca-icerik"></div>
+</div>
+
 <!-- KOŞU: yalnızca koşu kayıtları. Strava bağlantısı ve grafikler burada. -->
 <div class="bolum" id="bolum-kosu" role="tabpanel" aria-labelledby="st-kosu" data-spor="kosu" hidden>
   <div class="k-actions">
@@ -2466,6 +2514,159 @@
         ciz('text', {x: P.l + bant * (i + .5), y: H - 8, 'text-anchor': 'middle', class: 'c-tick' + (simdi ? ' is-now' : '')}, svg)
           .textContent = simdi ? 'Bu hafta' : gunAy.format(pzt);
       });
+    };
+
+    // ---------- Hocanın programı ----------
+    // Korhan Hoca'nın uygulamasından okunan program (Korhan Hoca Program klasöründeki ekran görüntüleri).
+    // Yalnız okunur: burada kayıt tutulmaz, grafiğe girmez. Set/tekrar/dinlenme birebir aktarıldı.
+    const HOCA = [
+      {kisa: 'Pzt', gun: 'Pazartesi', ad: 'Üst Vücut', ogeler: [
+        {tip: 'super', tur: 2, dinlenme: 60, ogeler: [
+          {no: '1a', ad: 'Band İnternal Rotation', doz: '2 set · 15 tekrar · 60 sn'},
+          {no: '1b', ad: 'Band External Rotation', doz: '2 set · 15 tekrar · 60 sn'},
+        ]},
+        {no: 2, ad: 'Close Grip Lat Pull Down', doz: '3 set · 12 tekrar · 40 sn'},
+        {no: 3, ad: 'Seated Cable Row', doz: '4 set · 10 tekrar · 50 sn'},
+        {no: 4, ad: 'Dumbbell Lateral Raise', doz: '4 set · 12 tekrar · 50 sn'},
+        {no: 5, ad: 'Machine Chest Press', doz: '3 set · 10 tekrar · 50 sn'},
+        {no: 6, ad: 'Pec Deck Fly', doz: '3 set · 10 tekrar · 50 sn'},
+        {no: 7, ad: 'V Bar Push Down', doz: '4 set · 15 tekrar · 40 sn'},
+        {no: 8, ad: 'Barbell Hammer Curl', doz: '3 set · 10 tekrar · 60 sn'},
+        {tip: 'super', tur: 2, dinlenme: 30, ogeler: [
+          {no: '9a', ad: 'Child Pose', doz: '2 set · 50 sn · 30 sn'},
+          {no: '9b', ad: 'Upper Trapezius Stretch', doz: '2 set · 50 sn · 30 sn'},
+        ]},
+        {no: 10, ad: 'Brisk Walking', doz: '1 set · 30 dk', kardiyo: true, not: '110–130 bpm nabız'},
+      ]},
+      {kisa: 'Sal', gun: 'Salı', ad: 'Alt Vücut', ogeler: [
+        {no: 1, ad: 'Brisk Walking', doz: '1 set · 10 dk', kardiyo: true, not: 'ısınma'},
+        {no: 2, ad: 'Leg Extension', doz: '3 set · 15 tekrar · 40 sn'},
+        {no: 3, ad: 'Lying Leg Curl', doz: '3 set · 15 tekrar · 50 sn'},
+        {no: 4, ad: 'Barbell Squat', doz: '3 set · 20 tekrar · 50 sn'},
+        {no: 5, ad: 'Leg Press', doz: '3 set · 15 tekrar · 60 sn'},
+        {no: 6, ad: 'Standing Calf Raise', doz: '5 set · 20 tekrar · 60 sn'},
+        {tip: 'super', tur: 2, dinlenme: 40, ogeler: [
+          {no: '7a', ad: 'Hamstring Stretch', doz: '2 set · 15 tekrar · 40 sn'},
+          {no: '7b', ad: 'Lunge Stretch', doz: '2 set · 30 sn · 30 sn'},
+        ]},
+        {no: 8, ad: 'Brisk Walking', doz: '1 set · 20 dk', kardiyo: true, not: '110–130 bpm nabız'},
+      ]},
+      {kisa: 'Çar', gun: 'Çarşamba', ad: 'Kardiyo', ogeler: [
+        {no: 1, ad: 'Brisk Walking', doz: '1 set · 20 dk', kardiyo: true,
+          not: '110–130 bpm nabız · koşu bandın varsa tercih edebilirsin veya bisiklet; her ikisi de yoksa dışarıda yürüyüş'},
+        {tip: 'super', tur: 4, dinlenme: 40, ogeler: [
+          {no: '2a', ad: 'Leg Raise', doz: '4 set · 15 tekrar · 40 sn'},
+          {no: '2b', ad: 'Crunch', doz: '4 set · 15 tekrar · 40 sn'},
+        ]},
+      ]},
+      {kisa: 'Per', gun: 'Perşembe', ad: 'Çekiş', ogeler: [
+        {tip: 'super', tur: 2, dinlenme: 40, ogeler: [
+          {no: '1a', ad: 'Band İnternal Rotation', doz: '2 set · 12 tekrar · 40 sn'},
+          {no: '1b', ad: 'Band Pull Apart', doz: '2 set · 12 tekrar · 40 sn'},
+        ]},
+        {no: 2, ad: 'Lat Pull Down', doz: '4 set · 12 tekrar · 40 sn'},
+        {no: 3, ad: 'Seated Cable Row', doz: '4 set · 10 tekrar · 40 sn'},
+        {no: 4, ad: 'Dumbbell Row', doz: '3 set · 12 tekrar · 40 sn'},
+        {no: 5, ad: 'Hyperextention', doz: '3 set · 10 tekrar · 50 sn'},
+        {no: 6, ad: 'Dumbbell Alternating Curl', doz: '3 set · 15 tekrar · 45 sn'},
+        {no: 7, ad: 'Dumbbell Hammer Curl', doz: '3 set · 12 tekrar · 50 sn'},
+        {tip: 'super', tur: 3, dinlenme: 30, ogeler: [
+          {no: '8a', ad: 'Child Pose', doz: '3 set · 30 sn · 30 sn'},
+          {no: '8b', ad: 'Interlaced Fingers Stretch', doz: '3 set · 30 sn · 30 sn'},
+        ]},
+        {no: 9, ad: 'Brisk Walking', doz: '1 set · 20 dk', kardiyo: true, not: '110–130 bpm nabız'},
+      ]},
+      {kisa: 'Cum', gun: 'Cuma', ad: 'İtiş', ogeler: [
+        {tip: 'super', tur: 2, dinlenme: 40, ogeler: [
+          {no: '1a', ad: 'Band Pull Apart', doz: '2 set · 12 tekrar · 40 sn'},
+          {no: '1b', ad: 'Prone Y Raise', doz: '2 set · 12 tekrar · 40 sn'},
+        ]},
+        {no: 2, ad: 'Machine Chest Press', doz: '4 set · 12 tekrar · 50 sn'},
+        {no: 3, ad: 'Pec Deck Fly', doz: '3 set · 10 tekrar · 60 sn'},
+        {no: 4, ad: 'Push Up', doz: '3 set · 12 tekrar · 50 sn'},
+        {no: 5, ad: 'Smith Machine Shoulder Press', doz: '3 set · 10 tekrar · 40 sn'},
+        {tip: 'super', tur: 2, dinlenme: 40, ogeler: [
+          {no: '6a', ad: 'Dumbbell Lateral Raise', doz: '2 set · 15 tekrar · 40 sn'},
+          {no: '6b', ad: 'Bend Over Lateral Raise', doz: '3 set · 12 tekrar · 40 sn'},
+        ]},
+        {no: 7, ad: 'Rope Push Down', doz: '3 set · 12 tekrar · 40 sn'},
+        {tip: 'super', tur: 3, dinlenme: 30, ogeler: [
+          {no: '8a', ad: 'Overhead Triceps Stretch', doz: '3 set · 40 sn · 30 sn'},
+          {no: '8b', ad: 'Upper Trapezius Stretch', doz: '2 set · 30 sn · 30 sn'},
+        ]},
+        {no: 9, ad: 'Brisk Walking', doz: '1 set · 20 dk', kardiyo: true, not: '110–130 bpm nabız'},
+      ]},
+      {kisa: 'Cmt', gun: 'Cumartesi', ad: 'Kardiyo', eksik: true, ogeler: []},
+    ];
+
+    const hocaKok = document.getElementById('bolum-hoca');
+    let hocaGun = Math.min(5, (new Date().getDay() + 6) % 7);
+
+    const hocaOgeSatiri = o => {
+      const li = document.createElement('li');
+      li.className = 'h-oge' + (o.kardiyo ? ' is-kardiyo' : '');
+      li.innerHTML = '<span class="h-no"></span><span class="h-ad"></span><span class="h-doz"></span>';
+      li.querySelector('.h-no').textContent = o.no;
+      li.querySelector('.h-ad').textContent = o.ad;
+      li.querySelector('.h-doz').textContent = o.doz;
+      if (o.not) {
+        const n = document.createElement('p');
+        n.className = 'h-not';
+        n.textContent = o.not;
+        li.append(n);
+      }
+      return li;
+    };
+
+    const hocaCiz = () => {
+      if (hocaKok.hidden) return;
+      hocaKok.querySelector('.hoca-gunler').replaceChildren(...HOCA.map((g, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'hoca-gun';
+        b.setAttribute('role', 'tab');
+        b.setAttribute('aria-selected', String(i === hocaGun));
+        b.innerHTML = '<small></small>';
+        b.querySelector('small').textContent = g.kisa;
+        b.append(g.ad);
+        b.addEventListener('click', () => { hocaGun = i; hocaCiz(); });
+        return b;
+      }));
+
+      const g = HOCA[hocaGun];
+      const sayi = g.ogeler.length;   // uygulamadaki gibi: süperset tek egzersiz sayılır
+      const kart = document.createElement('div');
+      kart.className = 'hoca-kart';
+      kart.innerHTML = '<div class="hoca-bas"><h3></h3><span></span></div>';
+      kart.querySelector('h3').textContent = g.ad;
+      kart.querySelector('.hoca-bas span').textContent = g.eksik
+        ? `${g.gun} · ekran görüntüsü yok`
+        : `${g.gun} · ${sayi} egzersiz`;
+      if (g.eksik) {
+        const p = document.createElement('p');
+        p.className = 'hoca-ust';
+        p.style.margin = '12px 0 0';
+        p.textContent = 'Bu günün ekranı gönderilen görüntülerde yoktu; uygulamadaki sekmede "Kardiyo" yazıyordu. '
+          + 'Ekranı atarsan buraya da eklerim.';
+        kart.append(p);
+      }
+      const liste = document.createElement('ul');
+      liste.className = 'hoca-liste';
+      g.ogeler.forEach(o => {
+        if (o.tip !== 'super') return liste.append(hocaOgeSatiri(o));
+        const blok = document.createElement('li');
+        blok.className = 'h-super';
+        blok.innerHTML = '<p class="h-super-bas"></p>'
+          + '<p class="h-super-not">Listedeki hareketleri sırasıyla tek set olarak yap. Hepsi bitince dinlen; bu bir turdur.</p>';
+        blok.querySelector('.h-super-bas').textContent = `Süperset · ${o.tur} tur · ${o.dinlenme} sn dinlenme`;
+        const ic = document.createElement('ul');
+        ic.className = 'hoca-liste';
+        o.ogeler.forEach(x => ic.append(hocaOgeSatiri(x)));
+        blok.append(ic);
+        liste.append(blok);
+      });
+      kart.append(liste);
+      hocaKok.querySelector('.hoca-icerik').replaceChildren(kart);
     };
 
     // ---------- Beslenme sekmesi ----------
@@ -4411,6 +4612,7 @@
       if (odak) sekme.focus();
       if (adres) history.replaceState(null, '', '#' + sekme.dataset.adres);
       if (sekme.dataset.adres === 'analiz') gelisimCiz();
+      else if (sekme.dataset.adres === 'hoca') hocaCiz();
       else if (sekme.dataset.adres === 'beslenme') beslenmeCiz();
       else if (SPOR[sekme.dataset.adres]) sporCiz(sekme.dataset.adres);
       else renderPanel();
