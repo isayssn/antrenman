@@ -448,7 +448,8 @@
   .h-sets li{padding:2px 7px;font-size:.82rem;white-space:nowrap;background:var(--surface);border:1px solid var(--rule);border-radius:2px;}
   .h-sets li.is-top{border-color:var(--day);font-weight:600;}
   .h-sets small{margin-left:5px;font-size:.74rem;font-weight:400;color:var(--ink-soft);}
-  .h-actions{display:flex;gap:2px;}
+  .h-actions{display:flex;gap:2px;align-items:center;}
+  .h-kaynak{font-size:.74rem;color:var(--ink-soft);white-space:nowrap;}
   .h-actions button{
     padding:3px 6px;font:inherit;font-size:.76rem;color:var(--ink-soft);
     background:none;border:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;
@@ -2105,6 +2106,28 @@
     const depola = () => { try { localStorage.setItem(DEPO, JSON.stringify(depo)); return true; } catch { return false; } };
     const seanslar = anahtar => (depo.kayitlar[anahtar] || []).slice().sort((a, b) => a.tarih.localeCompare(b.tarih));
 
+    // ----- aynı hareketin başka günlerdeki kayıtları -----
+    // Hoca sekmesindeki satır, aynı adlı hareketin başka programdaki/gündeki kayıtlarını da
+    // gösterir: ölçü aynı hareket, geçmişi bölmenin anlamı yok (kullanıcı isteği). Kayıtlar yine
+    // kendi anahtarında durur — buradan yazılan satırın anahtarına yazılır, yabancı kayıt
+    // yalnız okunur. Fitness tarafı değişmez; Analiz de yalnız kendi anahtarlarını sayar, yani
+    // hiçbir kayıt iki kez hesaba girmez.
+    const anahtarAdi = a => a.slice(a.indexOf('/') + 1);
+    const anahtarGunu = a => {
+      const gun = document.getElementById(a.slice(0, a.indexOf('/')));
+      if (!gun) return a.slice(0, a.indexOf('/'));
+      return (gun.closest('#bolum-hoca') ? 'Hoca' : 'Fitness') + ' · '
+        + (gun.querySelector('.daycard-title')?.textContent || '');
+    };
+    const esSeanslar = anahtar => Object.keys(depo.kayitlar)
+      .filter(a => a !== anahtar && anahtarAdi(a) === anahtarAdi(anahtar))
+      .flatMap(a => seanslar(a).map(x => ({...x, kaynak: a})));
+    const birlesikSeanslar = anahtar => [...seanslar(anahtar), ...esSeanslar(anahtar)]
+      .sort((a, b) => a.tarih.localeCompare(b.tarih));
+    // Hoca satırı birleşik geçmişi görür, Fitness satırı yalnız kendininkini.
+    const gorunenSeanslar = ex => ex.closest('#bolum-hoca')
+      ? birlesikSeanslar(exAnahtar(ex)) : seanslar(exAnahtar(ex));
+
     // Hareketi telefonda izlemek için hızlı kısayol: satırdaki düğme YouTube aramasını açar,
     // detay ekranında ayrıca "Adı kopyala" var (pano izni yoksa eski usul seçip kopyalamaya düşer).
     const youtubeAdresi = ad => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(ad);
@@ -2162,18 +2185,21 @@
       const rozet = ex.querySelector('.ex-log');
       if (!rozet) return;   // takip edilmeyen satır: bant ısınması, esneme, yürüyüş
       const ad = ex.querySelector('.ex-name').textContent;
-      const liste = seanslar(exAnahtar(ex));
+      const liste = gorunenSeanslar(ex);
       const gunTarihi = ex.closest('.day')?.dataset.tarih;
       const bugunku = gunTarihi && liste.find(x => x.tarih === gunTarihi);
       const son = bugunku || liste.at(-1);
       const kg = son && ortalamaKg(son);
+      // Gösterilen kayıt başka bir günden geliyorsa nereden geldiği rozetin ucunda yazar.
+      const nereden = son?.kaynak ? ` (${anahtarGunu(son.kaynak)})` : '';
       rozet.innerHTML = (bugunku ? TIK : IKON) + `<span>${son ? nf.format(kg) + ' kg' : 'Kayıt ekle'}</span>`;
       rozet.classList.toggle('is-empty', !son);
       rozet.classList.toggle('is-yapildi', !!bugunku);
+      rozet.title = son?.kaynak ? `${anahtarGunu(son.kaynak)} kaydı` : '';
       rozet.setAttribute('aria-label', bugunku
-        ? `${ad} bugün yapıldı: ortalama ${nf.format(kg)} kilo. İlerlemeyi aç`
+        ? `${ad} bugün yapıldı: ortalama ${nf.format(kg)} kilo${nereden}. İlerlemeyi aç`
         : son
-          ? `${ad} ilerlemesi. Son antrenman ${gunAy.format(tarihOku(son.tarih))}: ortalama ${nf.format(kg)} kilo`
+          ? `${ad} ilerlemesi. Son antrenman ${gunAy.format(tarihOku(son.tarih))}: ortalama ${nf.format(kg)} kilo${nereden}`
           : `${ad} için kayıt ekle`);
     };
 
@@ -2256,6 +2282,8 @@
     const formuDoldur = (tarih, duzenle = false) => {
       const liste = seanslar(aktif.anahtar);
       const varOlan = liste.find(s => s.tarih === tarih);
+      // Ağırlık önerisi aynı hareketin en son antrenmanından gelir (başka günde yapılmışsa da).
+      const oneriler = aktif.liste();
       const mevcut = duzenle ? varOlan : null;
       tarihGir.value = tarih;
       duzenlenen = mevcut ? tarih : null;
@@ -2263,7 +2291,7 @@
       if (mevcut) {
         mevcut.setler.forEach(s => setGovde.append(setSatiri(s)));
       } else {
-        const son = liste.at(-1);
+        const son = oneriler.at(-1);
         for (let i = 0; i < aktif.plan.set; i++) {
           const onceki = son && (son.setler[i] || son.setler.at(-1));
           setGovde.append(setSatiri({}, onceki ? kgYaz(onceki.kg) : ''));
@@ -2327,6 +2355,7 @@
       const kutular = [
         ['Son antrenman', son ? nf.format(ortalamaKg(son)) + ' kg' : '—', son
           ? `ortalama · en ağır ${nf.format(sonSet.kg)} kg × ${sonSet.tekrar} · ${gunAy.format(tarihOku(son.tarih))}`
+            + (son.kaynak ? ` · ${anahtarGunu(son.kaynak)}` : '')
           : 'henüz kayıt yok'],
         ['En iyi set', enIyi ? nf.format(enAgir(enIyi).kg) + ' kg' : '—', enIyi ? gunAy.format(tarihOku(enIyi.tarih)) : ''],
         ['Değişim', ...degisim],
@@ -2369,8 +2398,11 @@
     let cizimGenisligi = 0;
 
     const grafikCiz = () => {
-      const liste = seanslar(aktif.anahtar);
-      $('.chart-note').textContent = liste.length ? NOT[olcu] : '';
+      const liste = aktif.liste();
+      const es = liste.some(x => x.kaynak);
+      $('.chart-note').textContent = liste.length
+        ? NOT[olcu] + (es ? ' Aynı hareketi başka günlerde de yaptığın için o kayıtlar da bu grafikte.' : '')
+        : '';
       $('.chart-empty').hidden = liste.length > 0;
       cizelge.hidden = !liste.length;
       cizelge.querySelector('svg')?.remove();
@@ -2444,7 +2476,8 @@
         const baslik = document.createElement('b');
         baslik.textContent = nf.format(p.v) + ' kg';
         const tarih = document.createElement('span');
-        tarih.textContent = tamTarih.format(new Date(p.t));
+        tarih.textContent = tamTarih.format(new Date(p.t))
+          + (p.s.kaynak ? ' · ' + anahtarGunu(p.s.kaynak) : '');
         const setListesi = document.createElement('ul');
         p.s.setler.forEach(s => {
           const li = document.createElement('li');
@@ -2517,6 +2550,14 @@
           }
           li.querySelector('.h-sets').append(sl);
         });
+        if (seans.kaynak) {
+          // Başka bir günün kaydı: buradan düzenlenmez, kendi satırında durur.
+          const kaynak = document.createElement('span');
+          kaynak.className = 'h-kaynak';
+          kaynak.textContent = anahtarGunu(seans.kaynak);
+          li.querySelector('.h-actions').replaceChildren(kaynak);
+          return li;
+        }
         const [duzenle, sil] = li.querySelectorAll('.h-actions button');
         duzenle.setAttribute('aria-label', `${tamTarih.format(d)} kaydını düzenle`);
         sil.setAttribute('aria-label', `${tamTarih.format(d)} kaydını sil`);
@@ -2539,7 +2580,7 @@
     };
 
     const yenile = () => {
-      const liste = seanslar(aktif.anahtar);
+      const liste = aktif.liste();
       istatistikCiz(liste);
       grafikCiz();
       gecmisCiz(liste);
@@ -2549,7 +2590,7 @@
 
     const detayAc = ex => {
       const day = ex.closest('.day');
-      aktif = {ex, anahtar: exAnahtar(ex), plan: planOku(ex)};
+      aktif = {ex, anahtar: exAnahtar(ex), plan: planOku(ex), liste: () => gorunenSeanslar(ex)};
       detay.dataset.tur = day.classList.contains('day--lower') ? 'lower' : 'upper';
       $('.detail-kicker').textContent = `${day.querySelector('.daycard-title').textContent} · ${day.querySelector('.day-when').textContent}`;
       const exAd = ex.querySelector('.ex-name').textContent;
