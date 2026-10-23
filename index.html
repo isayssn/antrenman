@@ -723,6 +723,9 @@
   .esitle-durum.is-error{color:var(--caution);}
   .iyimser{color:var(--ink-soft);font-weight:400;}
   .jeton-alan{display:flex;gap:6px;}
+  .onay-satir{display:flex;gap:9px;align-items:flex-start;margin:14px 0 0;font-size:.88rem;cursor:pointer;}
+  .onay-satir input{width:17px;height:17px;margin:2px 0 0;flex:none;accent-color:var(--ink);}
+  .onay-satir small{display:block;margin-top:2px;font-size:.82rem;color:var(--ink-soft);}
   .jeton-alan input{flex:1;min-width:0;}
   .jeton-goster{
     flex:none;padding:0 10px;font:inherit;font-size:.78rem;color:var(--ink-soft);cursor:pointer;
@@ -1417,13 +1420,17 @@
           </label>
           <label class="genis"><span>Gist kimliği ya da adresi <span class="iyimser">(ilk cihazda boş bırak)</span></span><input name="gist" autocomplete="off" spellcheck="false" placeholder="https://gist.github.com/…"></label>
         </div>
+        <label class="onay-satir"><input type="checkbox" name="stravaDa" checked>
+          <span>Strava bağlantısını da eşitle — diğer cihazda yeniden kurmana gerek kalmaz.
+            <small>Client Secret ve izin anahtarı gist'e yazılır; kapatırsan bir sonraki eşitlemede oradan silinir.</small></span>
+        </label>
         <div class="log-actions">
           <button type="button" class="btn-ghost" data-esitle="kaldir" hidden>Bağlantıyı kaldır</button>
           <span class="log-msg" role="status" aria-live="polite"></span>
           <button type="submit" class="btn">Kaydet ve eşitle</button>
         </div>
       </form>
-      <p class="strava-not">Jeton yalnızca bu tarayıcıda, kayıtlardan ayrı bir anahtarda durur; yedeğe ve demoya geçmez. Gist "secret" açılır: adresi bilmeyen göremez, ama GitHub hesabında durur. İstediğin an GitHub ayarlarından jetonu iptal edebilirsin.</p>
+      <p class="strava-not">GitHub jetonu yalnızca bu tarayıcıda, kayıtlardan ayrı bir anahtarda durur; yedeğe ve demoya geçmez (Strava bağlantısı da öyle — yalnız yukarıdaki kutu açıkken gist'e yazılır). Gist "secret" açılır: adresi bilmeyen göremez, ama GitHub hesabında durur. İstediğin an GitHub ayarlarından jetonu iptal edebilirsin.</p>
     </div>
   </div>
 </dialog>
@@ -4254,7 +4261,15 @@
     const saatDk = new Intl.DateTimeFormat('tr-TR', {hour: '2-digit', minute: '2-digit'});
     let strava = {};
     try { strava = JSON.parse(localStorage.getItem(STRAVA_DEPO)) || {}; } catch { strava = {}; }
-    const stravaYaz = () => { try { localStorage.setItem(STRAVA_DEPO, JSON.stringify(strava)); } catch { /* depolama kapalı */ } };
+    // Eşitleme bölümü aşağıda; kurulunca bu kancayı dolduruyor. Böylece bağlantı değişince
+    // (ilk kurulum, anahtar yenileme, kaldırma) gist'teki kopya da tazelenir.
+    let esitleTetik = () => {};
+    let esitleCek = async () => false;   // "gist'ten bir kez tazele" — aşağıda doldurulur
+    const stravaYaz = (tetikle = true) => {
+      strava.d = Date.now();   // iki cihaz arasında damgası yeni olan kazanır
+      try { localStorage.setItem(STRAVA_DEPO, JSON.stringify(strava)); } catch { /* depolama kapalı */ }
+      if (tetikle) esitleTetik();
+    };
     const stravaBagli = () => !!(strava.clientId && strava.clientSecret && strava.refreshToken);
 
     const sd = document.getElementById('strava');
@@ -4309,8 +4324,7 @@
       if (!sd.open) sd.showModal();
     };
 
-    const jeton = async () => {
-      if (strava.accessToken && strava.expiresAt > Date.now() / 1000 + 120) return strava.accessToken;
+    const jetonYenile = async () => {
       const y = await fetch('https://www.strava.com/oauth/token', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -4323,6 +4337,15 @@
       strava.expiresAt = j.expires_at;
       stravaYaz();
       return strava.accessToken;
+    };
+    const jeton = async () => {
+      if (strava.accessToken && strava.expiresAt > Date.now() / 1000 + 120) return strava.accessToken;
+      try { return await jetonYenile(); } catch (h) {
+        // Strava yenilemede izin anahtarını değiştirebiliyor: başka cihaz yenilediyse bizdeki
+        // eskimiştir. Bağlantı eşitleniyorsa gist'ten bir kez tazeleyip tekrar deneriz.
+        if (!(await esitleCek())) throw h;
+        return jetonYenile();
+      }
     };
     const stravaApi = async (yol, sorgu) => {
       const t = await jeton();
@@ -4497,6 +4520,7 @@
     sq('[data-strava="kaldir"]').addEventListener('click', () => {
       strava = {};
       try { localStorage.removeItem(STRAVA_DEPO); } catch { /* depolama kapalı */ }
+      esitleTetik();   // gist'teki kopya da silinsin
       sq('[data-strava="kaldir"]').hidden = true;
       sMesaj('Bağlantı kaldırıldı.');
       sonGuncellemeYaz();
@@ -4525,6 +4549,10 @@
     try { esitleme = JSON.parse(localStorage.getItem(ESITLE_DEPO)) || {}; } catch { esitleme = {}; }
     const esitlemeYaz = () => { try { localStorage.setItem(ESITLE_DEPO, JSON.stringify(esitleme)); } catch { /* depolama kapalı */ } };
     const esitlemeVar = () => !!(esitleme.jeton && esitleme.gist);
+    // Strava bağlantısı da eşitlensin mi (varsayılan evet; eşitleme penceresinden kapatılır).
+    // Kapalıyken gist'e yazılmaz ve gist'tekine de dokunulmaz — bir sonraki yazmada oradan silinir.
+    const stravaPaylas = () => esitleme.strava !== false;
+    const stravaTam = x => !!(x && x.clientId && x.clientSecret && x.refreshToken);
 
     const damga = nesne => { nesne.d = Date.now(); return nesne; };
     const mezar = anahtar => {
@@ -4586,6 +4614,12 @@
       sonuc.beslenme = Object.fromEntries(Object.entries(bh).filter(([tarih, g]) => !gomulu(`beslenme|${tarih}`, g)));
       sonuc.ayarlar = {...(uzak.ayarlar || {}), ...(yerel.ayarlar || {})};
 
+      // Strava bağlantısı: yarım kalmış (refresh token'sız) kopya hiç sayılmaz, kalanlardan
+      // damgası yeni olan kazanır. En sona eklenir ki anahtar sırası yerel kopyayla aynı kalsın.
+      const stravaAday = [yerel.strava, uzak.strava].filter(stravaTam)
+        .sort((a, b) => (b.d || 0) - (a.d || 0))[0];
+      if (stravaAday) sonuc.strava = stravaAday;
+
       // "Şunlar geldi" sayısı: sonuçta duran ama yerelde olmayan kayıtlar. Silme izine takılanlar sayılmaz.
       const yereldeVar = (anahtar, tarih) => (yerel.kayitlar?.[anahtar] || []).some(s => s.tarih === tarih);
       const say = {
@@ -4623,6 +4657,13 @@
       } catch { return false; }
     };
 
+    // Gist'e yazılan paket. Strava bağlantısı yalnız tamsa ve paylaşım açıksa en sonda eklenir.
+    const yerelDepo = () => ({
+      surum: 1, kayitlar: depo.kayitlar, kardiyo: depo.kardiyo,
+      ayarlar: depo.ayarlar, beslenme: depo.beslenme || {}, silinen: depo.silinen || {},
+      ...(stravaPaylas() && stravaTam(strava) ? {strava} : {}),
+    });
+
     let esitleniyor = false, bekleyen = null;
     const esitle = async ({sessiz = false} = {}) => {
       if (!esitlemeVar() || esitleniyor) return;
@@ -4633,11 +4674,9 @@
         const icerik = gist.files?.[GIST_DOSYA]?.content;
         let uzak = {};
         if (icerik) { try { uzak = JSON.parse(icerik); } catch { uzak = {}; } }
-        const {sonuc, say} = depoBirlestir(depo, uzak);
-        const yereldeDegisti = JSON.stringify(sonuc) !== JSON.stringify({
-          surum: 1, kayitlar: depo.kayitlar, kardiyo: depo.kardiyo,
-          ayarlar: depo.ayarlar, beslenme: depo.beslenme || {}, silinen: depo.silinen || {},
-        });
+        const {sonuc, say} = depoBirlestir(yerelDepo(), uzak);
+        if (!stravaPaylas()) delete sonuc.strava;
+        const yereldeDegisti = JSON.stringify(sonuc) !== JSON.stringify(yerelDepo());
         if (yereldeDegisti) {
           depo.kayitlar = sonuc.kayitlar;
           depo.kardiyo = sonuc.kardiyo;
@@ -4647,6 +4686,12 @@
           depola();
           document.querySelectorAll('.ex').forEach(rozetGuncelle);
           sayfaYenile();
+        }
+        // Başka cihazda kurulmuş (ya da yenilenmiş) Strava bağlantısı buraya da insin.
+        if (stravaPaylas() && stravaTam(sonuc.strava) && JSON.stringify(sonuc.strava) !== JSON.stringify(strava)) {
+          strava = sonuc.strava;
+          stravaYaz(false);   // geldiği yere geri yazmaya gerek yok
+          sonGuncellemeYaz();
         }
         if (JSON.stringify(sonuc) !== JSON.stringify(uzak)) {
           await gistApi(`/gists/${esitleme.gist}`, {
@@ -4672,6 +4717,14 @@
       clearTimeout(bekleyen);
       bekleyen = setTimeout(() => esitle({sessiz: true}), 4000);
     };
+    esitleTetik = esitleSonra;   // Strava bağlantısı değişince de eşitle
+    // Eski izin anahtarıyla karşılaşan cihaz buradan tazeleyip bir kez daha dener.
+    esitleCek = async () => {
+      if (!esitlemeVar() || !stravaPaylas()) return false;
+      const eskiAnahtar = strava.refreshToken;
+      await esitle({sessiz: true});
+      return strava.refreshToken !== eskiAnahtar;
+    };
 
     const ed = document.getElementById('esitle');
     const eq = sel => ed.querySelector(sel);
@@ -4691,6 +4744,7 @@
     const esitleAc = () => {
       ef.elements.jeton.value = esitleme.jeton || '';
       ef.elements.gist.value = esitleme.gist || '';
+      ef.elements.stravaDa.checked = stravaPaylas();
       eq('[data-esitle="kaldir"]').hidden = !esitlemeVar();
       eMesaj(esitlemeVar() ? `Bağlı. Gist kimliği: ${esitleme.gist}` : '');
       if (!ed.open) ed.showModal();
@@ -4701,7 +4755,8 @@
       const girilen = ef.elements.gist.value.trim();
       if (!jeton) return eMesaj('Jeton gerekli.', true);
       const eski = {...esitleme};
-      esitleme = {jeton, gist: (girilen.match(/[0-9a-f]{20,}/i) || [''])[0], son: esitleme.son};
+      esitleme = {jeton, gist: (girilen.match(/[0-9a-f]{20,}/i) || [''])[0], son: esitleme.son,
+        strava: ef.elements.stravaDa.checked};
       try {
         if (!esitleme.gist) {
           // Boş bırakıldıysa önce hesapta bu sayfanın gist'i var mı diye bakılır: yoksa her cihaz
@@ -4719,7 +4774,7 @@
             body: JSON.stringify({
               description: 'Antrenman sayfası kayıtları (gizli)',
               public: false,
-              files: {[GIST_DOSYA]: {content: JSON.stringify({surum: 1, kayitlar: depo.kayitlar, kardiyo: depo.kardiyo, ayarlar: depo.ayarlar, beslenme: depo.beslenme || {}, silinen: depo.silinen || {}})}},
+              files: {[GIST_DOSYA]: {content: JSON.stringify(yerelDepo())}},
             }),
           });
           esitleme.gist = yeni.id;
