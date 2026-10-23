@@ -36,6 +36,11 @@
   *{box-sizing:border-box;}
   html{-webkit-text-size-adjust:100%;}
 
+  /* hidden niteliği, kendi display'i olan öğelerde (display:grid/flex) yenilir; bu sayfada üç kez
+     ısırdı (analiz başlıkları, özet kutuları, Strava'nın kod alanı). Tek kuralla bitiyor.
+     Yazdırmada gizli gün kartlarını bilerek açan kural aşağıda !important ile bunu geçiyor. */
+  [hidden]{display:none !important;}
+
   body{
     margin:0;
     background:var(--paper);
@@ -162,7 +167,6 @@
 
   .anatomy-list{margin:12px 0 0;display:grid;gap:6px;font-size:.88rem;}
   .anatomy-list div{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;}
-  .anatomy-list div[hidden]{display:none;}
   .anatomy-list dt{color:var(--ink-soft);white-space:nowrap;}
   .anatomy-list dd{margin:0;font-weight:500;}
 
@@ -353,7 +357,6 @@
   .detail-about b{font-weight:500;}
 
   .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0;}
-  .stats[hidden]{display:none;}
   .stat{background:var(--surface);border:1px solid var(--rule);border-radius:2px;padding:12px 12px 11px;min-width:0;}
   .stat dt{font-size:.76rem;color:var(--ink-soft);}
   .stat dd{margin:3px 0 0;}
@@ -515,7 +518,6 @@
 
   /* o güne düşen koşu/yüzme: salon kartının altındaki blok (script ekler, kayıt yoksa gizli) */
   .gun-akt{margin:24px 0 0;padding:14px 16px 16px;background:#fff;border:1.5px dashed var(--rule);border-radius:2px;}
-  .gun-akt[hidden]{display:none;}
   .gun-akt-bas{margin:0 0 10px;font-size:.82rem;color:var(--ink-soft);}
   .gun-akt .akt-list{margin:0;}
   .wk-akt{display:block;margin-top:5px;font-size:.74rem;font-weight:600;color:var(--kardiyo);line-height:1.25;}
@@ -658,7 +660,6 @@
   .chip-nokta{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:50%;background:var(--day);vertical-align:1px;}
   .chip[aria-pressed="true"] .chip-nokta{background:#fff;}
   .bg-nokta{display:inline-block;width:8px;height:8px;margin-right:7px;border-radius:50%;background:var(--c);vertical-align:1px;}
-  .bg-chips[hidden]{display:none;}
   .bg-eksen{margin:14px 0 0;}
   .bg-hareket{cursor:pointer;}
   .bg-hareket:hover td{background:#fff;}
@@ -765,7 +766,6 @@
   .detail[data-tur="kardiyo"] .btn{background:var(--ink);}
   .k-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;margin:14px 0 0;}
   .k-form-grid label{display:grid;gap:4px;font-size:.78rem;color:var(--ink-soft);}
-  .k-form-grid label[hidden]{display:none;}
   .k-form-grid .genis{grid-column:1 / -1;}
   .k-tempo{margin:10px 0 0;font-size:.88rem;min-height:1.4em;}
   .best h3{font-size:1.05rem;font-weight:500;}
@@ -776,11 +776,9 @@
   /* run detail: Strava-like analysis, the edit form folds away below it */
   .detail--genis{width:min(820px,100%);}
   .k-analiz{display:grid;gap:24px;}
-  .k-analiz[hidden]{display:none;}   /* kendi display'i olan öğe hidden ile gizlenmez */
   .k-analiz h3{font-size:1.08rem;font-weight:500;margin:0 0 10px;}
   .analiz-yok{margin:0;font-size:.88rem;color:var(--ink-soft);}
   .y-ornek{display:grid;gap:24px;padding:16px;border:1.5px dashed var(--rule);border-radius:2px;}
-  .y-ornek[hidden]{display:none;}
   .y-ornek h3{font-size:1.08rem;font-weight:500;margin:0 0 10px;}
   .y-ornek-bas{margin:0;font-size:.84rem;line-height:1.5;color:var(--ink-soft);}
   .y-ornek-bas b{color:var(--ink);}
@@ -866,7 +864,7 @@
   @media print{
     body{background:#fff;}
     .day,.wk,.gun,.k-fig,tr{break-inside:avoid;}
-    .day[hidden]{display:block;}
+    .day[hidden]{display:block !important;}
     .anatomy,.ex-log,.ex-ara,.detail,.k-actions,.filtre,.sayfa-alt{display:none;}
   }
 </style>
