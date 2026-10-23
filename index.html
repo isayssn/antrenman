@@ -726,6 +726,13 @@
   .onay-satir{display:flex;gap:9px;align-items:flex-start;margin:14px 0 0;font-size:.88rem;cursor:pointer;}
   .onay-satir input{width:17px;height:17px;margin:2px 0 0;flex:none;accent-color:var(--ink);}
   .onay-satir small{display:block;margin-top:2px;font-size:.82rem;color:var(--ink-soft);}
+  .tasima{margin:26px 0 0;padding:16px 16px 14px;background:var(--surface);border:1.5px dashed var(--rule);border-radius:2px;}
+  .tasima h3{margin:0;font-family:Oswald,sans-serif;font-size:1.05rem;font-weight:500;}
+  .tasima p{margin:6px 0 0;font-size:.86rem;color:var(--ink-soft);}
+  .tasi-kutu{
+    width:100%;margin:12px 0 0;padding:8px 10px;font:inherit;font-size:.82rem;line-height:1.4;
+    word-break:break-all;background:#fff;border:1px solid var(--rule);border-radius:2px;resize:vertical;
+  }
   .jeton-alan input{flex:1;min-width:0;}
   .jeton-goster{
     flex:none;padding:0 10px;font:inherit;font-size:.78rem;color:var(--ink-soft);cursor:pointer;
@@ -1430,6 +1437,17 @@
           <button type="submit" class="btn">Kaydet ve eşitle</button>
         </div>
       </form>
+      <div class="tasima">
+        <h3>Kurulumu başka adrese / cihaza taşı</h3>
+        <p>Kurulu olan yerde <b>Kodu çıkar</b>'a bas, öbür yerde kutuya yapıştırıp <b>Kodu uygula</b>'ya bas. Jeton, gist kimliği ve (açıksa) Strava bağlantısı taşınır — elle bir şey yazmana gerek kalmaz. Kayıtlar kodda yok; onlar eşitlemeyle gelir, hiçbir kayıt silinmez (iki taraf birleştirilir).</p>
+        <textarea class="tasi-kutu" rows="3" spellcheck="false" autocomplete="off" placeholder="ANT1.… kodunu buraya yapıştır"></textarea>
+        <div class="log-actions">
+          <button type="button" class="btn-ghost" data-tasi="kopyala">Kodu çıkar ve kopyala</button>
+          <button type="button" class="btn-ghost" data-tasi="uygula">Kodu uygula</button>
+          <span class="log-msg tasi-msg" role="status" aria-live="polite"></span>
+        </div>
+        <p class="k-not">Kod, GitHub jetonunu ve Strava gizli anahtarını taşır — kimseyle paylaşma, işin bitince kutuyu temizle.</p>
+      </div>
       <p class="strava-not">GitHub jetonu yalnızca bu tarayıcıda, kayıtlardan ayrı bir anahtarda durur; yedeğe ve demoya geçmez (Strava bağlantısı da öyle — yalnız yukarıdaki kutu açıkken gist'e yazılır). Gist "secret" açılır: adresi bilmeyen göremez, ama GitHub hesabında durur. İstediğin an GitHub ayarlarından jetonu iptal edebilirsin.</p>
     </div>
   </div>
@@ -4726,6 +4744,24 @@
       return strava.refreshToken !== eskiAnahtar;
     };
 
+    // ----- kurulumu taşıma kodu -----
+    // Yeni bir adres/cihazda jetonu ve Strava bilgilerini elle girmek yerine: kurulu yerde kod
+    // çıkarılır, öbür yerde yapıştırılır. Kodda yalnız AYARLAR var (jeton, gist, Strava bağlantısı);
+    // kayıtlar yok — onlar eşitlemeden birleşerek gelir, hiçbir şeyin üzerine yazılmaz.
+    const b64Yaz = metin => btoa(String.fromCharCode(...new TextEncoder().encode(metin)));
+    const b64Oku = kod => new TextDecoder().decode(Uint8Array.from(atob(kod), c => c.charCodeAt(0)));
+    const kodCikar = () => 'ANT1.' + b64Yaz(JSON.stringify({
+      e: {jeton: esitleme.jeton || '', gist: esitleme.gist || '', strava: esitleme.strava !== false},
+      s: stravaTam(strava) ? strava : null,
+    }));
+    const kodCoz = metin => {
+      const g = (metin || '').trim().replace(/\s+/g, '');
+      if (!g.startsWith('ANT1.')) throw new Error('Kod tanınmadı; "ANT1." ile başlamalı.');
+      const v = JSON.parse(b64Oku(g.slice(5)));
+      if (!v || typeof v !== 'object') throw new Error('Kod okunamadı.');
+      return v;
+    };
+
     const ed = document.getElementById('esitle');
     const eq = sel => ed.querySelector(sel);
     const ef = eq('.esitle-form');
@@ -4741,6 +4777,39 @@
       e.target.textContent = acik ? 'Göster' : 'Gizle';
       e.target.setAttribute('aria-pressed', String(!acik));
     });
+    const tasiKutu = () => eq('.tasi-kutu');
+    const tasiMesaj = (metin, hata) => {
+      const m = eq('.tasi-msg');
+      m.textContent = metin;
+      m.classList.toggle('is-error', !!hata);
+    };
+    eq('[data-tasi="kopyala"]').addEventListener('click', async () => {
+      if (!esitlemeVar() && !stravaTam(strava)) return tasiMesaj('Taşınacak bir kurulum yok.', true);
+      const kod = kodCikar();
+      tasiKutu().value = kod;
+      tasiKutu().select();
+      tasiMesaj(await panoyaYaz(kod) ? 'Kopyalandı. Öbür cihazda yapıştır.' : 'Kopyalanamadı; kutudaki kodu elle seç.');
+    });
+    eq('[data-tasi="uygula"]').addEventListener('click', async () => {
+      try {
+        const v = kodCoz(tasiKutu().value);
+        if (v.e?.jeton) {
+          esitleme = {...esitleme, jeton: v.e.jeton, gist: v.e.gist || esitleme.gist, strava: v.e.strava !== false};
+          esitlemeYaz();
+        }
+        if (v.s && stravaTam(v.s)) {
+          strava = v.s;
+          stravaYaz(false);
+          sonGuncellemeYaz();
+        }
+        tasiKutu().value = '';
+        esitleAc();
+        tasiMesaj('Ayarlar alındı, eşitleniyor…');
+        await esitle();
+        tasiMesaj('Hazır: ' + [esitlemeVar() && 'eşitleme açık', stravaBagli() && 'Strava bağlı'].filter(Boolean).join(', '));
+      } catch (h) { tasiMesaj(h.message, true); }
+    });
+
     const esitleAc = () => {
       ef.elements.jeton.value = esitleme.jeton || '';
       ef.elements.gist.value = esitleme.gist || '';
